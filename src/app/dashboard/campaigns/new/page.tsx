@@ -49,24 +49,24 @@ function LoadingOverlay({ elapsed }: { elapsed: number }) {
       <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl text-center space-y-6">
         {/* Animated logo ring */}
         <div className="relative mx-auto h-20 w-20">
-          <div className="absolute inset-0 rounded-full border-4 border-[#0077b6]/20" />
-          <div className="absolute inset-0 rounded-full border-4 border-t-[#0077b6] animate-spin" />
+          <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-t-indigo-600 animate-spin" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="h-8 w-8 text-[#0077b6]" />
+            <Sparkles className="h-8 w-8 text-indigo-600" />
           </div>
         </div>
 
         <div className="space-y-2">
           <h3 className="text-lg font-semibold text-gray-900">Generating AI Campaign</h3>
-          <p className="text-sm text-[#0077b6] font-medium min-h-[20px] transition-all">
+          <p className="text-sm text-indigo-600 font-medium min-h-[20px] transition-all">
             {step.text}
           </p>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-100 rounded-full h-2">
+        <div className="w-full bg-zinc-100 rounded-full h-2">
           <div
-            className="bg-[#0077b6] h-2 rounded-full transition-all duration-1000"
+            className="bg-indigo-600 h-2 rounded-full transition-all duration-1000"
             style={{ width: `${Math.min((elapsed / 120) * 100, 95)}%` }}
           />
         </div>
@@ -187,7 +187,7 @@ export default function NewCampaignPage() {
 
           {/* Reuse banner */}
         {isReuse && (
-          <div className="flex items-center gap-3 rounded-lg border border-[#0077b6]/30 bg-[#0077b6]/5 px-4 py-3 text-sm text-[#0077b6]">
+          <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
             <Copy className="h-4 w-4 flex-shrink-0" />
             <p>
               <span className="font-semibold">Reusing previous campaign.</span>{' '}
@@ -363,7 +363,7 @@ export default function NewCampaignPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#0077b6] hover:bg-[#005f8f] text-white"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
               size="lg"
               disabled={isSubmitting}
             >

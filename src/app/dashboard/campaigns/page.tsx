@@ -265,7 +265,7 @@ export default function CampaignsPage() {
       <div className="p-6 space-y-8">
         {/* New Campaign */}
         <div className="flex justify-end">
-          <Button asChild className="bg-[#0077b6] hover:bg-[#005f8f] text-white">
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
             <Link href="/dashboard/campaigns/new">
               <Plus className="mr-2 h-4 w-4" /> New Campaign
             </Link>
@@ -299,7 +299,7 @@ export default function CampaignsPage() {
 
             <div className="grid gap-4">
               {pending.map((campaign) => (
-                <Card key={campaign.id} className="border-l-4 border-l-amber-400 shadow-sm">
+                <Card key={campaign.id} className="border-l-4 border-l-amber-400 border-zinc-200 shadow-sm">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div>
@@ -329,7 +329,7 @@ export default function CampaignsPage() {
 
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1 bg-[#0077b6] hover:bg-[#005f8f] text-white"
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
                         onClick={() => openReview(campaign)}
                       >
                         <Eye className="mr-2 h-4 w-4" /> Review &amp; Approve
@@ -406,7 +406,7 @@ export default function CampaignsPage() {
                           title="Reuse this campaign"
                           disabled={reusingId === campaign.id}
                           onClick={() => handleReuse(campaign.id)}
-                          className="text-[#0077b6] border-[#0077b6]/30 hover:bg-[#0077b6]/5 gap-1.5"
+                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5"
                         >
                           <Copy className="h-3.5 w-3.5" />
                           Reuse
@@ -482,13 +482,13 @@ export default function CampaignsPage() {
                 {selectedCampaign.aiGeneratedContent ? (
                   <div className="rounded-xl border overflow-hidden">
                     {/* Email header — subject + preview */}
-                    <div className="bg-[#0077b6] px-5 py-4">
-                      <p className="text-[11px] text-blue-200 uppercase tracking-wider mb-1">Subject Line</p>
+                    <div className="bg-indigo-600 px-5 py-4">
+                      <p className="text-[11px] text-indigo-200 uppercase tracking-wider mb-1">Subject Line</p>
                       <p className="text-white font-semibold text-sm leading-snug">
                         {selectedCampaign.aiGeneratedContent.subject_line ?? '—'}
                       </p>
                       {selectedCampaign.aiGeneratedContent.preview_text && (
-                        <p className="text-blue-100 text-xs mt-2 leading-relaxed opacity-90">
+                        <p className="text-indigo-100 text-xs mt-2 leading-relaxed opacity-90">
                           {selectedCampaign.aiGeneratedContent.preview_text}
                         </p>
                       )}
@@ -559,22 +559,22 @@ export default function CampaignsPage() {
             <div className="flex flex-col items-center justify-center px-6 py-14 text-center space-y-6">
               {/* Animated ring */}
               <div className="relative h-20 w-20">
-                <div className="absolute inset-0 rounded-full border-4 border-[#0077b6]/20" />
-                <div className="absolute inset-0 rounded-full border-4 border-t-[#0077b6] animate-spin" />
+                <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-t-indigo-600 animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Send className="h-7 w-7 text-[#0077b6]" />
+                  <Send className="h-7 w-7 text-indigo-600" />
                 </div>
               </div>
 
               <div>
                 <h3 className="text-base font-semibold text-gray-900">Sending Emails...</h3>
-                <p className="text-sm text-[#0077b6] mt-1 min-h-[20px]">{currentStep.text}</p>
+                <p className="text-sm text-indigo-600 mt-1 min-h-[20px]">{currentStep.text}</p>
               </div>
 
               {/* Progress bar */}
-              <div className="w-full max-w-xs bg-gray-100 rounded-full h-2">
+              <div className="w-full max-w-xs bg-zinc-100 rounded-full h-2">
                 <div
-                  className="bg-[#0077b6] h-2 rounded-full transition-all duration-1000"
+                  className="bg-indigo-600 h-2 rounded-full transition-all duration-1000"
                   style={{ width: `${Math.min((elapsed / 70) * 100, 95)}%` }}
                 />
               </div>
@@ -648,7 +648,7 @@ export default function CampaignsPage() {
               )}
 
               <Button
-                className="w-full bg-[#0077b6] hover:bg-[#005f8f] text-white"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                 onClick={closeDialog}
               >
                 Done
@@ -685,7 +685,7 @@ export default function CampaignsPage() {
                   <RotateCcw className="mr-2 h-4 w-4" /> Try Again
                 </Button>
                 <Button
-                  className="flex-1 bg-[#0077b6] hover:bg-[#005f8f] text-white"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
                   onClick={closeDialog}
                 >
                   Close

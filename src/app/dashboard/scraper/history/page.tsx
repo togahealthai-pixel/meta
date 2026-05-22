@@ -76,7 +76,7 @@ export default function ScraperHistoryPage() {
               <ArrowLeft className="h-4 w-4" /> Back to Scraper
             </Link>
           </Button>
-          <Button asChild className="bg-[#0077b6] hover:bg-[#005f8f] text-white gap-2">
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
             <Link href="/dashboard/scraper">
               <Search className="h-4 w-4" /> New Scrape
             </Link>
@@ -103,7 +103,7 @@ export default function ScraperHistoryPage() {
             <Search className="h-12 w-12 mb-3 opacity-30" />
             <p className="text-lg font-medium">No scraper runs yet</p>
             <p className="text-sm mb-4">Start a scrape to find leads on Google Maps</p>
-            <Button asChild className="bg-[#0077b6] hover:bg-[#005f8f] text-white">
+            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
               <Link href="/dashboard/scraper">Start Scraping</Link>
             </Button>
           </div>
@@ -132,7 +132,7 @@ export default function ScraperHistoryPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#0077b6]" />
+                  <Clock className="h-4 w-4 text-indigo-600" />
                   All Scraper Runs ({jobs.length})
                 </CardTitle>
               </CardHeader>
@@ -210,7 +210,7 @@ export default function ScraperHistoryPage() {
                                 href={sheetUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-[#0077b6] hover:underline"
+                                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
                               >
                                 <ExternalLink className="h-3 w-3" /> Open
                               </a>

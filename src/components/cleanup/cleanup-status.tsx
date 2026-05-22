@@ -57,7 +57,7 @@ export function CleanupStatus() {
       <Card className="md:col-span-2">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Trash2 className="h-4 w-4 text-[#0077b6]" />
+            <Trash2 className="h-4 w-4 text-indigo-600" />
             Cleanup Status
           </CardTitle>
           <CardDescription>

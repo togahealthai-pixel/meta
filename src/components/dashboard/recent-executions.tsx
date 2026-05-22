@@ -15,7 +15,7 @@ export interface ExecutionItem {
   workflowName: string | null;
   status: string;
   createdAt: Date;
-  campaignId: string | null; // only set for CAMPAIGN type
+  campaignId: string | null;
 }
 
 const statusColors: Record<string, 'success' | 'destructive' | 'secondary' | 'warning'> = {
@@ -33,15 +33,12 @@ export function RecentExecutions({ initialExecutions }: { initialExecutions: Exe
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reusingId, setReusingId] = useState<string | null>(null);
 
-  // ── Delete campaign or execution ────────────────────────────────────────────
   async function handleDelete(exec: ExecutionItem) {
     const name = exec.workflowName || 'this campaign';
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
 
     setDeletingId(exec.id);
     try {
-      // If campaign record exists → delete via campaign (cascades to execution)
-      // If no campaign record (failed/pending) → delete execution directly
       const url = exec.campaignId
         ? `/api/campaigns/${exec.campaignId}`
         : `/api/executions/${exec.id}`;
@@ -58,7 +55,6 @@ export function RecentExecutions({ initialExecutions }: { initialExecutions: Exe
     }
   }
 
-  // ── Reuse campaign ──────────────────────────────────────────────────────────
   async function handleReuse(exec: ExecutionItem) {
     if (!exec.campaignId) return;
     setReusingId(exec.id);
@@ -78,22 +74,20 @@ export function RecentExecutions({ initialExecutions }: { initialExecutions: Exe
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#0077b6]" />
+          <Activity className="h-4 w-4 text-indigo-600" />
           Recent Workflow Executions
         </CardTitle>
       </CardHeader>
       <CardContent>
         {executions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
             <CheckCircle className="h-10 w-10 mb-2 opacity-30" />
             <p className="text-sm">No workflows run yet. Start by creating a campaign!</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-zinc-100">
             {executions.map((exec) => {
-              // Show delete for ALL campaign executions (success, failed, pending)
               const isCampaignExec = exec.workflowType === 'CAMPAIGN';
-              // Reuse only makes sense when AI content was generated (campaign record exists)
               const canReuse = isCampaignExec && !!exec.campaignId;
               const isDeleting = deletingId === exec.id;
               const isReusing = reusingId === exec.id;
@@ -101,39 +95,36 @@ export function RecentExecutions({ initialExecutions }: { initialExecutions: Exe
               return (
                 <div
                   key={exec.id}
-                  className="flex items-center justify-between rounded-lg border-b border-gray-100 bg-transparent px-4 py-3 gap-3 hover:bg-gray-50/50 transition-colors"
+                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-zinc-50"
                 >
-                  {/* Icon + name */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#0077b6]/10">
-                      {exec.workflowType === 'CAMPAIGN' && <Mail className="h-4 w-4 text-[#0077b6]" />}
-                      {exec.workflowType === 'SCRAPER' && <Search className="h-4 w-4 text-[#0077b6]" />}
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-50">
+                      {exec.workflowType === 'CAMPAIGN' && <Mail className="h-4 w-4 text-indigo-600" />}
+                      {exec.workflowType === 'SCRAPER' && <Search className="h-4 w-4 text-indigo-600" />}
                       {(exec.workflowType === 'CLEANUP' || exec.workflowType === 'CAMPAIGN_APPROVAL') && (
-                        <Trash2 className="h-4 w-4 text-[#0077b6]" />
+                        <Trash2 className="h-4 w-4 text-indigo-600" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-zinc-900 truncate">
                         {exec.workflowName || exec.workflowType}
                       </p>
-                      <p className="text-xs text-gray-500">{formatRelativeTime(exec.createdAt)}</p>
+                      <p className="text-xs text-zinc-500">{formatRelativeTime(exec.createdAt)}</p>
                     </div>
                   </div>
 
-                  {/* Right side: status + actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge variant={statusColors[exec.status] ?? 'secondary'}>
                       {exec.status}
                     </Badge>
 
-                    {/* Reuse — only for campaigns with AI content */}
                     {canReuse && (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={isReusing}
                         onClick={() => handleReuse(exec)}
-                        className="h-7 px-2 text-xs text-[#0077b6] border-[#0077b6]/30 hover:bg-[#0077b6]/5 gap-1"
+                        className="h-7 px-2 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1"
                         title="Reuse this campaign"
                       >
                         <Copy className="h-3 w-3" />
@@ -141,14 +132,13 @@ export function RecentExecutions({ initialExecutions }: { initialExecutions: Exe
                       </Button>
                     )}
 
-                    {/* Delete — for ALL campaign executions including failed/pending */}
                     {isCampaignExec && (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={isDeleting}
                         onClick={() => handleDelete(exec)}
-                        className="h-7 px-2 text-xs text-red-500 border-red-200 hover:bg-red-50 gap-1"
+                        className="h-7 px-2 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 gap-1"
                         title="Delete this campaign"
                       >
                         <Trash2 className="h-3 w-3" />

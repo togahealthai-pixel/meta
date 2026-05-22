@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-export async function POST(request) {
+interface ProxyPayload {
+  url?: string;
+  body?: unknown;
+  method?: string;
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const { url, body, method = 'POST' } = await request.json();
+    const { url, body, method = 'POST' } = (await request.json()) as ProxyPayload;
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -10,8 +16,8 @@ export async function POST(request) {
 
     console.log(`Proxying ${method} request to: ${url}`);
 
-    const fetchOptions = {
-      method: method,
+    const fetchOptions: RequestInit = {
+      method,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -28,6 +34,7 @@ export async function POST(request) {
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error('Proxy error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

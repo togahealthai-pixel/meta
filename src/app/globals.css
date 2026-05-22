@@ -1,138 +1,46 @@
 @import "tailwindcss";
 
 /* ============================================================
-   AUMATIC DASHBOARD — DESIGN SYSTEM
-   Single source of truth. No duplicate variable definitions.
+   TOGAHH — DESIGN SYSTEM
+   Single source of truth. Light, modern SaaS aesthetic.
    ============================================================ */
 
-/* ── 1. CORE DESIGN TOKENS (hex, for inline styles throughout page.js) ── */
-:root {
-  /* Brand Blue */
-  --primary: #2563EB;
-  --primary-light: #EFF6FF;
-  --primary-mid: #DBEAFE;
-  --primary-dark: #1D4ED8;
-  --primary-strong: #1E40AF;
-
-  /* Teal / Secondary */
-  --secondary: #0891B2;
-  --secondary-light: #ECFEFF;
-  --secondary-dark: #0E7490;
-
-  /* Green */
-  --green: #059669;
-  --green-light: #ECFDF5;
-  --green-dark: #047857;
-
-  /* Amber */
-  --amber: #D97706;
-  --amber-light: #FFFBEB;
-  --amber-dark: #B45309;
-
-  /* Red / Error */
-  --red: #DC2626;
-  --red-light: #FEF2F2;
-  --red-dark: #B91C1C;
-  --red-strong: #991B1B;
-  --red-error: #EF4444;
-  --red-error-bg: #FEF2F2;
-
-  /* Purple */
-  --purple: #7C3AED;
-  --purple-light: #F5F3FF;
-  --purple-dark: #6D28D9;
-
-  /* Blue info */
-  --blue: #3B82F6;
-  --blue-light: #EFF6FF;
-
-  /* Page / Surfaces */
-  --bg: #F8FAFC;
-  --bg-light: #F1F5F9;
-  --card-bg: #FFFFFF;
-  --surface: #F8FAFC;
-  --surface-hover: #F1F5F9;
-
-  /* Borders */
-  --border: #E2E8F0;
-  --border-light: #F1F5F9;
-  --border-mid: #CBD5E1;
-
-  /* Typography */
-  --text: #0F172A;
-  --text-body: #334155;
-  --text-muted: #64748B;
-  --text-dim: #94A3B8;
-
-  /* Border radius */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-pill: 9999px;
-  --radius-full: 50%;
-
-  /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
-
-  /* Font */
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-
-  /* ── 2. SHADCN-COMPATIBLE TOKENS (for dashboard/ and ui/ components)
-          Named differently to avoid ANY clash with the main tokens above. ── */
-  --shadcn-bg: #F8FAFC;
-  --shadcn-fg: #0F172A;
-  --shadcn-card: #FFFFFF;
-  --shadcn-card-fg: #0F172A;
-  --shadcn-popover: #FFFFFF;
-  --shadcn-popover-fg: #0F172A;
-  --shadcn-primary: #2563EB;
-  --shadcn-primary-fg: #FFFFFF;
-  --shadcn-secondary: #F1F5F9;
-  --shadcn-secondary-fg: #0F172A;
-  --shadcn-muted: #F1F5F9;
-  --shadcn-muted-fg: #64748B;
-  --shadcn-accent: #F1F5F9;
-  --shadcn-accent-fg: #0F172A;
-  --shadcn-destructive: #EF4444;
-  --shadcn-destructive-fg: #FFFFFF;
-  --shadcn-border: #E2E8F0;
-  --shadcn-input: #E2E8F0;
-  --shadcn-ring: #2563EB;
-  --shadcn-radius: 0.5rem;
-}
-
-/* ── 3. TAILWIND v4 THEME OVERRIDES
-        Maps Tailwind utility classes to our design tokens.
-        Uses DIRECT values — no hsl(var(...)) to avoid cascade conflicts. ── */
+/* ── TAILWIND v4 THEME — maps utility classes to design tokens ── */
 @theme {
-  /* ── Shadcn semantic colours (used by src/components/ui/*.tsx) ── */
-  --color-background: #F8FAFC;
-  --color-foreground: #0F172A;
+  /* Shadcn semantic colours (consumed by src/components/ui/*.tsx) */
+  --color-background: #FAFAFA;
+  --color-foreground: #18181B;
   --color-card: #FFFFFF;
-  --color-card-foreground: #0F172A;
+  --color-card-foreground: #18181B;
   --color-popover: #FFFFFF;
-  --color-popover-foreground: #0F172A;
-  --color-primary: #2563EB;
+  --color-popover-foreground: #18181B;
+  --color-primary: #4F46E5;
   --color-primary-foreground: #FFFFFF;
-  --color-secondary: #F1F5F9;
-  --color-secondary-foreground: #0F172A;
-  --color-muted: #F1F5F9;
-  --color-muted-foreground: #64748B;
-  --color-accent: #F1F5F9;
-  --color-accent-foreground: #0F172A;
+  --color-secondary: #F4F4F5;
+  --color-secondary-foreground: #18181B;
+  --color-muted: #F4F4F5;
+  --color-muted-foreground: #71717A;
+  --color-accent: #F4F4F5;
+  --color-accent-foreground: #18181B;
   --color-destructive: #EF4444;
   --color-destructive-foreground: #FFFFFF;
-  --color-border: #E2E8F0;
-  --color-input: #E2E8F0;
-  --color-ring: #2563EB;
+  --color-border: #E4E4E7;
+  --color-input: #E4E4E7;
+  --color-ring: #4F46E5;
 
-  /* ── Blue scale (focus rings, etc.) ── */
+  /* Indigo scale (primary brand) */
+  --color-indigo-50: #EEF2FF;
+  --color-indigo-100: #E0E7FF;
+  --color-indigo-200: #C7D2FE;
+  --color-indigo-300: #A5B4FC;
+  --color-indigo-400: #818CF8;
+  --color-indigo-500: #6366F1;
+  --color-indigo-600: #4F46E5;
+  --color-indigo-700: #4338CA;
+  --color-indigo-800: #3730A3;
+  --color-indigo-900: #312E81;
+
+  /* Blue scale (info, links) */
   --color-blue-50: #EFF6FF;
   --color-blue-100: #DBEAFE;
   --color-blue-200: #BFDBFE;
@@ -144,7 +52,19 @@
   --color-blue-800: #1E40AF;
   --color-blue-900: #1E3A8A;
 
-  /* ── Slate/gray scale aligned to our neutral tokens ── */
+  /* Zinc scale (neutrals) */
+  --color-zinc-50: #FAFAFA;
+  --color-zinc-100: #F4F4F5;
+  --color-zinc-200: #E4E4E7;
+  --color-zinc-300: #D4D4D8;
+  --color-zinc-400: #A1A1AA;
+  --color-zinc-500: #71717A;
+  --color-zinc-600: #52525B;
+  --color-zinc-700: #3F3F46;
+  --color-zinc-800: #27272A;
+  --color-zinc-900: #18181B;
+
+  /* Slate scale (kept for back-compat with existing dashboard components) */
   --color-slate-50: #F8FAFC;
   --color-slate-100: #F1F5F9;
   --color-slate-200: #E2E8F0;
@@ -156,19 +76,34 @@
   --color-slate-800: #1E293B;
   --color-slate-900: #0F172A;
 
-  /* ── Gray (mapped to same as slate) ── */
-  --color-gray-50: #F8FAFC;
-  --color-gray-100: #F1F5F9;
-  --color-gray-200: #E2E8F0;
-  --color-gray-300: #CBD5E1;
-  --color-gray-400: #94A3B8;
-  --color-gray-500: #64748B;
-  --color-gray-600: #475569;
-  --color-gray-700: #334155;
-  --color-gray-800: #1E293B;
-  --color-gray-900: #0F172A;
+  /* Gray (mirrors zinc) */
+  --color-gray-50: #FAFAFA;
+  --color-gray-100: #F4F4F5;
+  --color-gray-200: #E4E4E7;
+  --color-gray-300: #D4D4D8;
+  --color-gray-400: #A1A1AA;
+  --color-gray-500: #71717A;
+  --color-gray-600: #52525B;
+  --color-gray-700: #3F3F46;
+  --color-gray-800: #27272A;
+  --color-gray-900: #18181B;
 
-  /* ── Radix/Accordion animations ── */
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Shadows — Stripe-style */
+  --shadow-xs: 0 1px 2px 0 rgb(24 24 27 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(24 24 27 / 0.06), 0 1px 2px -1px rgb(24 24 27 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(24 24 27 / 0.06), 0 2px 4px -2px rgb(24 24 27 / 0.04);
+  --shadow-lg: 0 16px 32px -8px rgb(24 24 27 / 0.08), 0 4px 8px -4px rgb(24 24 27 / 0.04);
+  --shadow-xl: 0 24px 48px -12px rgb(24 24 27 / 0.10), 0 8px 16px -8px rgb(24 24 27 / 0.04);
+
+  /* Radix/Accordion animations */
   @keyframes accordion-down {
     from {
       height: 0;
@@ -193,14 +128,8 @@
   --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
-/* ── 4. BASE RESET ── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ── BASE — Tailwind v4 preflight already handles box-sizing + margin/padding resets.
+       Do NOT add a `* { margin: 0; padding: 0 }` rule here — it overrides utility classes. ── */
 
 html {
   -webkit-font-smoothing: antialiased;
@@ -209,22 +138,20 @@ html {
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   line-height: 1.5;
   min-height: 100vh;
 }
 
 ::selection {
-  background: var(--primary-mid);
-  color: var(--primary-dark);
+  background: #E0E7FF; /* indigo-100 */
+  color: #4338CA; /* indigo-700 */
 }
 
-/* ── 5. SCROLLBAR ── */
+/* ── SCROLLBAR ── */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -232,22 +159,22 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-mid);
+  background: #D4D4D8; /* zinc-300 */
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dim);
+  background: #A1A1AA; /* zinc-400 */
 }
 
-/* ── 6. RANGE INPUT ── */
+/* ── RANGE INPUT ── */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
   height: 5px;
   border-radius: 3px;
-  background: var(--border);
+  background: #E4E4E7; /* zinc-200 */
   outline: none;
   cursor: pointer;
 }
@@ -257,10 +184,10 @@ input[type="range"]::-webkit-slider-thumb {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: var(--primary);
+  background: #4F46E5; /* indigo-600 */
   cursor: pointer;
   border: 3px solid white;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.3);
   transition: transform 0.15s;
 }
 
@@ -272,16 +199,16 @@ input[type="range"]::-moz-range-thumb {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: var(--primary);
+  background: #4F46E5; /* indigo-600 */
   border: 3px solid white;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.3);
 }
 
 pre {
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
-/* ── 7. ANIMATIONS ── */
+/* ── 6. ANIMATIONS ── */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -382,6 +309,12 @@ pre {
   }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out;
 }
@@ -410,24 +343,7 @@ pre {
   animation: slideInRight 0.28s ease-out forwards;
 }
 
-/* ── 8. MOBILE RESPONSIVENESS ── */
-@media (max-width: 768px) {
-  :root {
-    --card-padding: 12px;
-    --metric-value-size: 22px;
-  }
-
-  .tab-nav {
-    display: flex !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    white-space: nowrap !important;
-    padding-bottom: 6px !important;
-    margin-bottom: 20px !important;
-    gap: 6px !important;
-  }
-
-  .tab-nav::-webkit-scrollbar {
-    display: none;
-  }
+.animate-shake {
+  animation: shake 0.3s ease-in-out;
 }
+

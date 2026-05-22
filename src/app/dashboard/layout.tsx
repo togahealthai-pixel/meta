@@ -1,18 +1,11 @@
-import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { AppShell } from '@/components/layout/app-shell';
 import { Sidebar } from '@/components/dashboard/sidebar';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
+  await getServerSession(authOptions);
   // Removed login wall as requested
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-white">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto">{children}</main>
-      </div>
-    </div>
-  );
+  return <AppShell sidebar={<Sidebar />}>{children}</AppShell>;
 }

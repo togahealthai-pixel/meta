@@ -70,7 +70,7 @@ export function ScraperResults() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Search className="h-4 w-4 text-[#0077b6]" />
+          <Search className="h-4 w-4 text-indigo-600" />
           Scraper History ({data.length})
         </CardTitle>
       </CardHeader>

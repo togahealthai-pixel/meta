@@ -32,8 +32,8 @@ export function CampaignChart({ data }: CampaignChartProps) {
               contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
             />
             <Legend />
-            <Bar dataKey="count" name="Campaigns" fill="#0077b6" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="sent" name="Emails Sent" fill="#2e86ab" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="count" name="Campaigns" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sent" name="Emails Sent" fill="#818CF8" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

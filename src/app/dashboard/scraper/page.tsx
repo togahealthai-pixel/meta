@@ -153,21 +153,21 @@ export default function ScraperPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl text-center space-y-6">
               <div className="relative mx-auto h-20 w-20">
-                <div className="absolute inset-0 rounded-full border-4 border-[#0077b6]/20" />
-                <div className="absolute inset-0 rounded-full border-4 border-t-[#0077b6] animate-spin" />
+                <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-t-indigo-600 animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Search className="h-8 w-8 text-[#0077b6]" />
+                  <Search className="h-8 w-8 text-indigo-600" />
                 </div>
               </div>
 
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Scraping Google Maps...</h3>
-                <p className="text-sm text-[#0077b6] mt-1 min-h-[20px] font-medium">{currentStep.text}</p>
+                <p className="text-sm text-indigo-600 mt-1 min-h-[20px] font-medium">{currentStep.text}</p>
               </div>
 
-              <div className="w-full bg-gray-100 rounded-full h-2.5">
+              <div className="w-full bg-zinc-100 rounded-full h-2.5">
                 <div
-                  className="bg-[#0077b6] h-2.5 rounded-full transition-all duration-1000"
+                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-1000"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -262,12 +262,12 @@ export default function ScraperPage() {
             </Card>
 
             {/* Info box */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 space-y-1">
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 space-y-1">
               <p className="font-semibold">What gets saved to Google Sheets:</p>
-              <p className="text-xs text-blue-700">
+              <p className="text-xs text-indigo-700">
                 first_name · last_name · mobile_number · personal_email · linkedin · city · country · email_status
               </p>
-              <p className="text-xs text-blue-600 mt-1">Invalid emails go to a separate "Invalid_Emails" sheet automatically.</p>
+              <p className="text-xs text-indigo-600 mt-1">Invalid emails go to a separate "Invalid_Emails" sheet automatically.</p>
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -276,7 +276,7 @@ export default function ScraperPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#0077b6] hover:bg-[#005f8f] text-white"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
               size="lg"
               disabled={pageState === 'loading'}
             >
@@ -316,7 +316,7 @@ export default function ScraperPage() {
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
-              { label: 'Total Scraped', value: summary.total_scraped, icon: Search, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+              { label: 'Total Scraped', value: summary.total_scraped, icon: Search, color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
               { label: 'Verified', value: summary.verified_leads, icon: CheckCircle, color: 'text-green-600 bg-green-50 border-green-200' },
               { label: 'Invalid', value: summary.invalid_leads, icon: XCircle, color: 'text-red-500 bg-red-50 border-red-200' },
               { label: 'Unknown', value: summary.unknown_leads, icon: HelpCircle, color: 'text-gray-500 bg-gray-50 border-gray-200' },
@@ -334,14 +334,14 @@ export default function ScraperPage() {
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <BarChart3 className="h-4 w-4 text-[#0077b6]" />
+                  <BarChart3 className="h-4 w-4 text-indigo-600" />
                   Email Verification Rate
                 </div>
-                <span className="text-lg font-bold text-[#0077b6]">{summary.success_rate}</span>
+                <span className="text-lg font-bold text-indigo-600">{summary.success_rate}</span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5">
+              <div className="w-full bg-zinc-100 rounded-full h-2.5">
                 <div
-                  className="bg-[#0077b6] h-2.5 rounded-full"
+                  className="bg-indigo-600 h-2.5 rounded-full"
                   style={{ width: summary.success_rate }}
                 />
               </div>
