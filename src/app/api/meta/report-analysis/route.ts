@@ -282,22 +282,34 @@ Return ONLY valid JSON — no markdown, no extra text:
 }`;
 
     let ai: Record<string, unknown> = {};
-    try {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-        body: JSON.stringify({
-          model: "gpt-4.1",
-          response_format: { type: "json_object" },
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.3,
-          max_tokens: 3000,
-        }),
-      });
-      const d = await r.json();
-      ai = JSON.parse(d.choices?.[0]?.message?.content || "{}");
-    } catch {
-      ai = { ai_overview: "AI analysis unavailable.", key_insights: [], underperformer_suggestions: [], top_performer_notes: [], overall_recommendation: "" };
+    let aiError = "";
+    for (const model of ["gpt-4o", "gpt-4-turbo"]) {
+      try {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+          body: JSON.stringify({
+            model,
+            response_format: { type: "json_object" },
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3,
+            max_tokens: 4000,
+          }),
+        });
+        if (!r.ok) {
+          const errText = await r.text();
+          throw new Error(`OpenAI ${r.status}: ${errText.slice(0, 200)}`);
+        }
+        const d = await r.json();
+        const content = d.choices?.[0]?.message?.content;
+        if (!content) throw new Error(`No content in response. Raw: ${JSON.stringify(d).slice(0, 200)}`);
+        ai = JSON.parse(content);
+        aiError = "";
+        break;
+      } catch (e) {
+        aiError = `[${model}] ${e instanceof Error ? e.message : String(e)}`;
+        console.error("[report-analysis GPT]", aiError);
+      }
     }
 
     return NextResponse.json({
@@ -318,6 +330,7 @@ Return ONLY valid JSON — no markdown, no extra text:
       top_performer_notes: ai.top_performer_notes || [],
       underperformer_suggestions: ai.underperformer_suggestions || [],
       overall_recommendation: (ai.overall_recommendation as string) || "",
+      ai_error: aiError,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";

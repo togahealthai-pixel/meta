@@ -193,7 +193,12 @@ function generateReportHTML(result: any, filter: string, note: string): string {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; }
-  @media print { body { background: #fff; } .no-print { display: none; } }
+  @media print {
+    body { background: #fff; }
+    .no-print { display: none; }
+    .section { break-inside: avoid; box-shadow: none; border: 1px solid #e2e8f0 !important; }
+    @page { margin: 1.5cm; size: A4; }
+  }
   h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: #0f172a; }
   h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
   .section { background: #fff; border-radius: 16px; padding: 24px 28px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
@@ -6094,83 +6099,227 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* ── Results: Report Ready card ── */}
+          {/* ── Results: Full Inline Report ── */}
           {reportResult && !reportLoading && (
-            <Card style={{ padding: '32px 28px', border: '1.5px solid var(--primary)', background: 'var(--primary-light)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <div style={{ fontSize: 24 }}>✅</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary)' }}>Report Ready</div>
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 480, lineHeight: 1.6 }}>
-                      {reportResult.ai_overview || 'Analysis complete.'}
-                    </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* ── Toolbar ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>AI Analysis Complete</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {reportResult.all_ads?.length || 0} ads &nbsp;·&nbsp; Last 30 days
+                    {reportResult.ai_error && (
+                      <span style={{ color: '#dc2626', marginLeft: 8 }}>⚠ AI error: {reportResult.ai_error}</span>
+                    )}
                   </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     onClick={() => {
                       const html = generateReportHTML(reportResult, reportFilter, reportNote);
-                      const blob = new Blob([html], { type: 'text/html' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `meta-ads-report-${new Date().toISOString().split('T')[0]}.html`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
+                      const win = window.open('', '_blank');
+                      if (!win) { alert('Allow pop-ups to download the PDF report'); return; }
+                      win.document.write(html);
+                      win.document.close();
+                      setTimeout(() => win.print(), 400);
                     }}
                     style={{
-                      padding: '11px 28px', borderRadius: 'var(--radius-md)', border: 'none',
-                      background: 'var(--primary)', color: '#fff', fontSize: 14, fontWeight: 700,
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-                      boxShadow: '0 4px 16px rgba(2,132,199,0.3)', transition: 'all 0.2s'
+                      padding: '9px 22px', borderRadius: 'var(--radius-md)', border: 'none',
+                      background: 'var(--primary)', color: '#fff', fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
+                      boxShadow: '0 4px 14px rgba(2,132,199,0.3)'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#0369a1'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--primary)'; }}
                   >
-                    ⬇ Download HTML Report
+                    ⬇ Download PDF
                   </button>
-                </div>
-
-                {/* KPI strip */}
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {[
-                    { label: 'Total Ads', value: reportResult.summary.total_ads },
-                    { label: 'Total Spend', value: `$${reportResult.summary.total_spend.toFixed(2)}` },
-                    { label: 'Impressions', value: reportResult.summary.total_impressions.toLocaleString() },
-                    { label: 'Avg CTR', value: `${reportResult.summary.avg_ctr.toFixed(2)}%` },
-                    { label: 'Avg CPM', value: `$${reportResult.summary.avg_cpm.toFixed(2)}` },
-                  ].map(m => (
-                    <div key={m.label} style={{ background: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '10px 16px', border: '1px solid rgba(2,132,199,0.15)' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--primary)', marginBottom: 3 }}>{m.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{m.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Overall recommendation */}
-                {reportResult.overall_recommendation && (
-                  <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '12px 16px', border: '1px solid rgba(2,132,199,0.2)' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginRight: 8 }}>TOP ACTION →</span>
-                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{reportResult.overall_recommendation}</span>
-                  </div>
-                )}
-
-                {/* Regenerate */}
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   <button
                     onClick={() => { setReportResult(null); setReportError(''); }}
-                    style={{ padding: '7px 16px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border)', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--text-muted)' }}
+                    style={{ padding: '9px 18px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border)', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-muted)' }}
                   >
                     ↺ New Analysis
                   </button>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Download opens the full report with all ads, AI suggestions, and improvement actions.</span>
                 </div>
               </div>
-            </Card>
+
+              {/* ── KPI Summary ── */}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {([
+                  { label: 'Total Ads', value: String(reportResult.summary.total_ads), color: '#3b82f6' },
+                  { label: 'Total Spend', value: `$${reportResult.summary.total_spend.toFixed(2)}`, color: '#0ea5e9' },
+                  { label: 'Impressions', value: reportResult.summary.total_impressions.toLocaleString(), color: '#f59e0b' },
+                  { label: 'Clicks', value: String(reportResult.summary.total_clicks), color: '#10b981' },
+                  { label: 'Avg CTR', value: `${reportResult.summary.avg_ctr.toFixed(2)}%`, color: '#8b5cf6' },
+                  { label: 'Avg CPM', value: `$${reportResult.summary.avg_cpm.toFixed(2)}`, color: '#64748b' },
+                  { label: 'Avg CPC', value: `$${reportResult.summary.avg_cpc.toFixed(2)}`, color: '#64748b' },
+                ] as { label: string; value: string; color: string }[]).map(m => (
+                  <div key={m.label} style={{ background: '#fff', borderRadius: 12, padding: '14px 18px', border: '1px solid var(--border)', minWidth: 110 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: m.color, marginBottom: 4 }}>{m.label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── AI Overview ── */}
+              {reportResult.ai_overview ? (
+                <Card style={{ borderLeft: '4px solid var(--primary)', background: 'var(--primary-light)', padding: '20px 24px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--primary)', marginBottom: 8 }}>AI Overview</div>
+                  <div style={{ fontSize: 15, lineHeight: 1.75, color: 'var(--text)' }}>{reportResult.ai_overview}</div>
+                  {reportResult.overall_recommendation && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(2,132,199,0.2)', fontSize: 13, color: '#1d4ed8', fontWeight: 600 }}>
+                      → {reportResult.overall_recommendation}
+                    </div>
+                  )}
+                </Card>
+              ) : (
+                <Card style={{ padding: '16px 20px', background: '#fef9c3', border: '1px solid #fde047' }}>
+                  <div style={{ fontSize: 13, color: '#92400e' }}>AI analysis could not be generated. Check the error above or retry.</div>
+                </Card>
+              )}
+
+              {/* ── Key Insights ── */}
+              {(reportResult.key_insights || []).length > 0 && (
+                <Card style={{ padding: '20px 24px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 14, color: 'var(--text)' }}>Key Insights</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(reportResult.key_insights as string[]).map((ins: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                        <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.65 }}>{ins}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* ── Top Performers ── */}
+              {(reportResult.top_performers || []).length > 0 && (
+                <Card style={{ padding: '20px 24px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 14, color: '#16a34a' }}>🏆 Top Performers</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(reportResult.top_performers as any[]).map((ad: any) => {
+                      const note_obj = (reportResult.top_performer_notes || []).find((n: any) => n.ad_id === ad.id);
+                      return (
+                        <div key={ad.id} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px' }}>
+                          {ad.media_url ? (
+                            <img src={ad.media_url} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
+                          ) : (
+                            <div style={{ width: 52, height: 52, borderRadius: 8, background: '#dcfce7', flexShrink: 0 }} />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
+                              <span style={{ background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                              CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; CPM: <b>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : '—'}</b>
+                            </div>
+                            {note_obj?.why_performing && (
+                              <div style={{ fontSize: 13, color: '#16a34a', fontStyle: 'italic' }}>✓ {note_obj.why_performing}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {/* ── Underperformers + Suggestions ── */}
+              {(reportResult.underperformers || []).length > 0 && (
+                <Card style={{ padding: '20px 24px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#dc2626' }}>⚠ Needs Improvement — Specific Changes to Make</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Per-ad viral rewrites, targeting fixes, and budget actions</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {(reportResult.underperformers as any[]).map((ad: any) => {
+                      const sugg = (reportResult.underperformer_suggestions || []).find((s: any) => s.ad_id === ad.id);
+                      return (
+                        <div key={ad.id} style={{ background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: '16px 18px' }}>
+                          {/* Ad header */}
+                          <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: sugg ? 14 : 0 }}>
+                            {ad.media_url ? (
+                              <img src={ad.media_url} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #fca5a5', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
+                            ) : (
+                              <div style={{ width: 52, height: 52, borderRadius: 8, background: '#fee2e2', flexShrink: 0 }} />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, flexWrap: 'wrap', gap: 6 }}>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
+                                <span style={{ background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; Status: <b>{ad.status}</b>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Suggestion tiles */}
+                          {sugg ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {([
+                                { label: 'Root Issue', val: sugg.issue, color: '#dc2626', bg: '#fff1f2' },
+                                { label: 'New Headline', val: sugg.headline_suggestion, color: '#2563eb', bg: '#eff6ff' },
+                                { label: 'New Ad Text', val: sugg.body_suggestion, color: '#2563eb', bg: '#eff6ff' },
+                                { label: 'Best CTA', val: sugg.cta_suggestion, color: '#7c3aed', bg: '#f5f3ff' },
+                                { label: 'Targeting Change', val: sugg.targeting_suggestion, color: '#0891b2', bg: '#ecfeff' },
+                                { label: 'Budget Action', val: sugg.budget_suggestion, color: '#d97706', bg: '#fffbeb' },
+                              ] as { label: string; val: string; color: string; bg: string }[]).filter(f => f.val).map(f => (
+                                <div key={f.label} style={{ background: f.bg, border: `1px solid ${f.color}25`, borderRadius: 10, padding: '10px 14px' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: f.color, marginBottom: 4 }}>{f.label}</div>
+                                  <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{f.val}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>No specific suggestions generated for this ad.</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {/* ── All Ads Table ── */}
+              {(reportResult.all_ads || []).length > 0 && (
+                <Card style={{ padding: '20px 24px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 14, color: 'var(--text)' }}>All Ads Performance</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc' }}>
+                          {['Ad Name', 'Status', 'Score', 'Spend', 'Impr.', 'Clicks', 'CTR', 'CPC', 'CPM'].map(h => (
+                            <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Ad Name' ? 'left' : 'center', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(reportResult.all_ads as any[]).map((ad: any, i: number) => {
+                          const scoreColor = ad.score >= 60 ? '#16a34a' : ad.score >= 25 ? '#d97706' : '#dc2626';
+                          const statusColor = ad.status === 'ACTIVE' ? '#16a34a' : '#64748b';
+                          return (
+                            <tr key={ad.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                              <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--text)', maxWidth: 200 }}>{ad.name}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, background: `${statusColor}18`, padding: '2px 8px', borderRadius: 20 }}>{ad.status}</span>
+                              </td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: scoreColor }}>{ad.score}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>${ad.spend.toFixed(2)}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{ad.impressions.toLocaleString()}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{ad.clicks}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: '#2563eb', fontWeight: 600 }}>{ad.ctr.toFixed(2)}%</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{ad.cpc > 0 ? `$${ad.cpc.toFixed(2)}` : '—'}</td>
+                              <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+
+            </div>
           )}
 
           {/* ── Empty state when no result and not loading ── */}
