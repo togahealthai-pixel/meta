@@ -5854,7 +5854,7 @@ export default function Dashboard() {
           REPORT ANALYSIS — AI-Powered Ad Performance Analysis
       ═══════════════════════════════════════════════════════ */}
       {tab === "report_analysis" && (
-        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 120, paddingTop: 8 }}>
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 8, paddingTop: 8 }}>
           <div>
             <SectionTitle style={{ marginBottom: 4 }}>Report Analysis</SectionTitle>
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
@@ -5984,20 +5984,35 @@ export default function Dashboard() {
                     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
                       {reportResult.top_performers.map((ad: any, i: number) => {
                         const note = reportResult.top_performer_notes?.find((n: any) => n.ad_id === ad.id);
+                        const isVideo = ad.media_url && (ad.media_url.includes(".mp4") || ad.media_url.includes(".mov") || ad.media_url.includes(".webm"));
                         return (
                           <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{ad.name}</div>
-                              <Badge text={`Score: ${ad.score}`} color="var(--green)" bg="var(--green-light)" />
+                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                              {/* Thumbnail */}
+                              {ad.media_url && (
+                                <a href={ad.media_url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                                  <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)" }}>
+                                    {isVideo
+                                      ? <video src={ad.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+                                      : <img src={ad.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+                                  </div>
+                                </a>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</div>
+                                  <Badge text={`Score: ${ad.score}`} color="var(--green)" bg="var(--green-light)" />
+                                </div>
+                                <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--text-muted)", marginBottom: 4, flexWrap: "wrap" }}>
+                                  <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
+                                  <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
+                                  <span>Clicks: <strong style={{ color: "var(--text)" }}>{ad.clicks}</strong></span>
+                                </div>
+                                {note?.why_performing && (
+                                  <div style={{ fontSize: 12, color: "var(--green)", fontStyle: "italic" }}>{note.why_performing}</div>
+                                )}
+                              </div>
                             </div>
-                            <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
-                              <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
-                              <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
-                              <span>Clicks: <strong style={{ color: "var(--text)" }}>{ad.clicks}</strong></span>
-                            </div>
-                            {note?.why_performing && (
-                              <div style={{ fontSize: 12, color: "var(--green)", fontStyle: "italic" }}>{note.why_performing}</div>
-                            )}
                           </div>
                         );
                       })}
@@ -6015,16 +6030,30 @@ export default function Dashboard() {
                     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
                       {reportResult.underperformers.map((ad: any) => {
                         const sugg = reportResult.underperformer_suggestions?.find((s: any) => s.ad_id === ad.id);
+                        const isVideo = ad.media_url && (ad.media_url.includes(".mp4") || ad.media_url.includes(".mov") || ad.media_url.includes(".webm"));
                         return (
                           <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{ad.name}</div>
-                              <Badge text={`Score: ${ad.score}`} color="var(--red-strong)" bg="var(--red-light)" />
-                            </div>
-                            <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-                              <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
-                              <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
-                              <span>CPC: <strong style={{ color: "var(--text)" }}>${ad.cpc.toFixed(2)}</strong></span>
+                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
+                              {ad.media_url && (
+                                <a href={ad.media_url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                                  <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)" }}>
+                                    {isVideo
+                                      ? <video src={ad.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+                                      : <img src={ad.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+                                  </div>
+                                </a>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</div>
+                                  <Badge text={`Score: ${ad.score}`} color="var(--red-strong)" bg="var(--red-light)" />
+                                </div>
+                                <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
+                                  <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
+                                  <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
+                                  <span>CPC: <strong style={{ color: "var(--text)" }}>${ad.cpc > 0 ? ad.cpc.toFixed(2) : "—"}</strong></span>
+                                </div>
+                              </div>
                             </div>
                             {sugg && (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -6110,65 +6139,64 @@ export default function Dashboard() {
               </div>
             </Card>
           )}
-        </div>
-      )}
 
-      {/* ── Sticky bottom bar for Report Analysis ── */}
-      {tab === "report_analysis" && (
-        <div style={{
-          position: "fixed", bottom: 24, left: sidebarCollapsed ? 68 : 260, right: 0, zIndex: 200,
-          background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid var(--border)", borderRadius: "0 0 0 0",
-          padding: "14px 24px",
-          display: "flex", alignItems: "center", gap: 12,
-          boxShadow: "0 -2px 16px rgba(0,0,0,0.06)"
-        }}>
-          {/* Filter buttons */}
-          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-            {(["both", "live", "paused"] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setReportFilter(f)}
-                style={{
-                  padding: "7px 14px", borderRadius: 20, border: "1.5px solid",
-                  borderColor: reportFilter === f ? "var(--primary)" : "var(--border)",
-                  background: reportFilter === f ? "var(--primary)" : "#fff",
-                  color: reportFilter === f ? "#fff" : "var(--text-muted)",
-                  fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize"
-                }}
-              >
-                {f === "both" ? "All Ads" : f === "live" ? "Live" : "Paused"}
-              </button>
-            ))}
+          {/* ── Bottom bar — sticky inside <main>, never touches sidebar ── */}
+          <div style={{
+            position: "sticky", bottom: 0, zIndex: 10,
+            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
+            borderTop: "1px solid var(--border)",
+            padding: "14px 0",
+            display: "flex", alignItems: "center", gap: 12,
+            boxShadow: "0 -2px 16px rgba(0,0,0,0.06)",
+            marginTop: 8,
+          }}>
+            {/* Filter buttons */}
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              {(["both", "live", "paused"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setReportFilter(f)}
+                  style={{
+                    padding: "7px 14px", borderRadius: 20, border: "1.5px solid",
+                    borderColor: reportFilter === f ? "var(--primary)" : "var(--border)",
+                    background: reportFilter === f ? "var(--primary)" : "#fff",
+                    color: reportFilter === f ? "#fff" : "var(--text-muted)",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize"
+                  }}
+                >
+                  {f === "both" ? "All Ads" : f === "live" ? "Live" : "Paused"}
+                </button>
+              ))}
+            </div>
+            {/* Text input */}
+            <input
+              type="text"
+              value={reportNote}
+              onChange={(e) => setReportNote(e.target.value)}
+              placeholder="Add a note or focus area (optional)..."
+              style={{
+                flex: 1, padding: "9px 16px", borderRadius: "var(--radius-md)",
+                border: "1.5px solid var(--border)", fontSize: 13, background: "#fff",
+                color: "var(--text)", outline: "none",
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !reportLoading) handleRunReport(); }}
+            />
+            {/* Analyse button */}
+            <button
+              onClick={handleRunReport}
+              disabled={reportLoading}
+              style={{
+                padding: "9px 24px", borderRadius: "var(--radius-md)", border: "none",
+                background: reportLoading ? "var(--border)" : "var(--primary)",
+                color: reportLoading ? "var(--text-muted)" : "#fff",
+                fontSize: 13, fontWeight: 700, cursor: reportLoading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                transition: "all 0.2s", boxShadow: reportLoading ? "none" : "0 4px 12px rgba(2,132,199,0.25)"
+              }}
+            >
+              {reportLoading ? <><Spinner size={14} color="var(--text-muted)" /> Analysing...</> : "Analyse"}
+            </button>
           </div>
-          {/* Text input */}
-          <input
-            type="text"
-            value={reportNote}
-            onChange={(e) => setReportNote(e.target.value)}
-            placeholder="Add a note or focus area (optional)..."
-            style={{
-              flex: 1, padding: "9px 16px", borderRadius: "var(--radius-md)",
-              border: "1.5px solid var(--border)", fontSize: 13, background: "#fff",
-              color: "var(--text)", outline: "none",
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter" && !reportLoading) handleRunReport(); }}
-          />
-          {/* Analyse button */}
-          <button
-            onClick={handleRunReport}
-            disabled={reportLoading}
-            style={{
-              padding: "9px 24px", borderRadius: "var(--radius-md)", border: "none",
-              background: reportLoading ? "var(--border)" : "var(--primary)",
-              color: reportLoading ? "var(--text-muted)" : "#fff",
-              fontSize: 13, fontWeight: 700, cursor: reportLoading ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-              transition: "all 0.2s", boxShadow: reportLoading ? "none" : "0 4px 12px rgba(2,132,199,0.25)"
-            }}
-          >
-            {reportLoading ? <><Spinner size={14} color="var(--text-muted)" /> Analysing...</> : "Analyse"}
-          </button>
         </div>
       )}
 
