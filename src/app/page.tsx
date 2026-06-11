@@ -6116,10 +6116,12 @@ export default function Dashboard() {
       {/* ── Sticky bottom bar for Report Analysis ── */}
       {tab === "report_analysis" && (
         <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
-          background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)",
-          borderTop: "1px solid var(--border)", padding: "14px 24px",
-          display: "flex", alignItems: "center", gap: 12
+          position: "fixed", bottom: 24, left: sidebarCollapsed ? 68 : 260, right: 0, zIndex: 200,
+          background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
+          borderTop: "1px solid var(--border)", borderRadius: "0 0 0 0",
+          padding: "14px 24px",
+          display: "flex", alignItems: "center", gap: 12,
+          boxShadow: "0 -2px 16px rgba(0,0,0,0.06)"
         }}>
           {/* Filter buttons */}
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
