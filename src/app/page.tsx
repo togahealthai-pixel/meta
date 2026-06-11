@@ -679,9 +679,9 @@ export default function Dashboard() {
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
-  // Edit Campaign / Ad Set Modal
+  // Edit Campaign / Ad Set / Ad Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editType, setEditType] = useState(null); // "Campaign" or "AdSet"
+  const [editType, setEditType] = useState<"Campaign" | "AdSet" | "Ad" | null>(null);
   const [editData, setEditData] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -918,6 +918,26 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditAd = async (adId: string) => {
+    setEditModalOpen(true);
+    setEditType("Ad");
+    setEditLoading(true);
+    setEditError("");
+    try {
+      const res = await fetch(`/api/meta/ad-details?adId=${adId}`);
+      const data = await res.json();
+      if (res.ok) {
+        setEditData(data);
+      } else {
+        setEditError(data.error || "Failed to fetch ad details");
+      }
+    } catch {
+      setEditError("Network error");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const updateTargeting = (key, value) => {
     if (!editData) return;
     let t = editData.targeting;
@@ -949,47 +969,59 @@ export default function Dashboard() {
     setEditError("");
     try {
       const payload: any = {};
+
       if (editType === "Campaign") {
         payload.campaignId = editData.id;
-        payload.campaignData = {
-          name: editData.name,
-        };
+        payload.campaignData = { name: editData.name };
+        // Budget (cents → API expects cents, user enters dollars so multiply ×100)
+        if (editData._daily_budget_dollars) payload.campaignData.daily_budget = Math.round(Number(editData._daily_budget_dollars) * 100);
+        if (editData._lifetime_budget_dollars) payload.campaignData.lifetime_budget = Math.round(Number(editData._lifetime_budget_dollars) * 100);
+        if (editData.end_time) payload.campaignData.end_time = editData.end_time;
+
       } else if (editType === "AdSet") {
         payload.adSetId = editData.id;
         let parsedTargeting = editData.targeting;
         if (typeof parsedTargeting === 'string') {
-          try {
-            parsedTargeting = JSON.parse(parsedTargeting);
-          } catch (e) {
-            setEditError("Invalid JSON in targeting");
-            setEditSaving(false);
-            return;
+          try { parsedTargeting = JSON.parse(parsedTargeting); } catch {
+            setEditError("Invalid targeting data"); setEditSaving(false); return;
           }
         }
-        payload.adSetData = {
+        payload.adSetData = { name: editData.name, targeting: parsedTargeting };
+        // Budget: user enters dollars, API needs cents
+        if (editData._daily_budget_dollars) payload.adSetData.daily_budget = Math.round(Number(editData._daily_budget_dollars) * 100);
+        if (editData._lifetime_budget_dollars) payload.adSetData.lifetime_budget = Math.round(Number(editData._lifetime_budget_dollars) * 100);
+        if (editData.start_time) payload.adSetData.start_time = editData.start_time;
+        if (editData.end_time) payload.adSetData.end_time = editData.end_time;
+        if (editData.bid_strategy) payload.adSetData.bid_strategy = editData.bid_strategy;
+        if (editData.bid_amount) payload.adSetData.bid_amount = Math.round(Number(editData.bid_amount) * 100);
+        if (editData.optimization_goal) payload.adSetData.optimization_goal = editData.optimization_goal;
+
+      } else if (editType === "Ad") {
+        payload.adId = editData.id;
+        payload.adData = {
           name: editData.name,
-          daily_budget: parseInt(editData.daily_budget, 10),
-          targeting: parsedTargeting
+          creative_id: editData.creative_id,
+          headline: editData.headline,
+          body: editData.body,
+          link_url: editData.link_url,
+          cta_type: editData.cta_type,
         };
-        if (editData.end_time) {
-          payload.adSetData.end_time = editData.end_time;
-        }
       }
 
       const res = await fetch("/api/meta/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) {
-        addSbToast(`${editType} updated successfully!`);
+        addSbToast(`${editType} updated! Meta will review changes before going live.`);
         setEditModalOpen(false);
         fetchLiveCampaigns();
       } else {
         setEditError(data.error || "Update failed");
       }
-    } catch (e) {
+    } catch {
       setEditError("Network error");
     } finally {
       setEditSaving(false);
@@ -5604,6 +5636,7 @@ export default function Dashboard() {
                                 )}
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                   {[
+                                    { label: "Edit", color: "var(--primary)", disabled: false, fn: () => handleEditAd(ad.id) },
                                     { label: "Run", color: "var(--green)", disabled: ad.effective_status === "ACTIVE" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "ACTIVE", "run") },
                                     { label: "Pause", color: "var(--amber)", disabled: ad.effective_status === "PAUSED" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "PAUSED", "pause") },
                                     { label: "Delete", color: "var(--red-strong)", disabled: updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", null, "delete") },
@@ -5624,9 +5657,17 @@ export default function Dashboard() {
               )}
             </Card>
           ))}
-          {editModalOpen && (
+          {editModalOpen && (() => {
+            const inpSt: React.CSSProperties = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 13, boxSizing: "border-box" };
+            const FieldRow = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>{label}{hint && <span style={{ fontWeight: 400, textTransform: "none", marginLeft: 4 }}>({hint})</span>}</div>
+                {children}
+              </div>
+            );
+            return (
             <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
-              <div style={{ background: "var(--surface)", width: 500, maxWidth: "90%", borderRadius: "var(--radius-lg)", padding: 24, display: "flex", flexDirection: "column", gap: 16, boxShadow: "var(--shadow-lg)" }}>
+              <div style={{ background: "var(--surface)", width: 520, maxWidth: "95%", borderRadius: "var(--radius-lg)", padding: 24, display: "flex", flexDirection: "column", gap: 16, boxShadow: "var(--shadow-lg)", maxHeight: "90vh", overflowY: "auto" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: 18, fontWeight: 700 }}>Edit {editType}</div>
                   <button onClick={() => setEditModalOpen(false)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "var(--text-muted)" }}>×</button>
@@ -5634,114 +5675,188 @@ export default function Dashboard() {
 
                 {editLoading ? (
                   <div style={{ padding: 40, display: "flex", justifyContent: "center" }}><Spinner size={24} color="var(--primary)" /></div>
-                ) : editError ? (
+                ) : editError && !editData ? (
                   <div style={{ padding: 12, background: "var(--red-light)", color: "var(--red-strong)", borderRadius: 8, fontSize: 13 }}>{editError}</div>
                 ) : editData ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Name</div>
-                      <input
-                        type="text"
-                        value={editData.name || ""}
-                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                      />
-                    </div>
-                    {editType === "AdSet" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "70vh", overflowY: "auto", paddingRight: 4 }}>
+
+                    {editError && <div style={{ padding: 10, background: "var(--red-light)", color: "var(--red-strong)", borderRadius: 8, fontSize: 13 }}>{editError}</div>}
+
+                    {/* ── CAMPAIGN fields ── */}
+                    {editType === "Campaign" && (
                       <>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Daily Budget (in cents)</div>
-                          <input
-                            type="number"
-                            value={editData.daily_budget || ""}
-                            onChange={(e) => setEditData({ ...editData, daily_budget: e.target.value })}
-                            style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                          />
+                        <FieldRow label="Campaign Name">
+                          <input type="text" value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} style={inpSt} />
+                        </FieldRow>
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Daily Budget ($)" hint="Leave blank to keep current">
+                            <input type="number" min="1" step="0.01"
+                              value={editData._daily_budget_dollars ?? (editData.daily_budget ? (editData.daily_budget / 100).toFixed(2) : "")}
+                              onChange={(e) => setEditData({ ...editData, _daily_budget_dollars: e.target.value })}
+                              placeholder="e.g. 20.00" style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="Lifetime Budget ($)" hint="Leave blank to keep current">
+                            <input type="number" min="1" step="0.01"
+                              value={editData._lifetime_budget_dollars ?? (editData.lifetime_budget ? (editData.lifetime_budget / 100).toFixed(2) : "")}
+                              onChange={(e) => setEditData({ ...editData, _lifetime_budget_dollars: e.target.value })}
+                              placeholder="e.g. 200.00" style={inpSt} />
+                          </FieldRow>
                         </div>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Target Locations (Country Codes, e.g. US, CA)</div>
-                          <input
-                            type="text"
-                            value={(() => {
-                              let t = editData.targeting;
-                              if (typeof t === 'string') try { t = JSON.parse(t); } catch (e) { t = {}; }
-                              return t?.geo_locations?.countries?.join(', ') || "";
-                            })()}
-                            onChange={(e) => updateTargeting('countries', e.target.value)}
-                            style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                          />
-                        </div>
-                        <div style={{ display: "flex", gap: 12 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Age Min</div>
-                            <input
-                              type="number" min="18" max="65"
-                              value={(() => {
-                                let t = editData.targeting;
-                                if (typeof t === 'string') try { t = JSON.parse(t); } catch (e) { t = {}; }
-                                return t?.age_min || 18;
-                              })()}
-                              onChange={(e) => updateTargeting('age_min', e.target.value)}
-                              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                            />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Age Max</div>
-                            <input
-                              type="number" min="18" max="65"
-                              value={(() => {
-                                let t = editData.targeting;
-                                if (typeof t === 'string') try { t = JSON.parse(t); } catch (e) { t = {}; }
-                                return t?.age_max || 65;
-                              })()}
-                              onChange={(e) => updateTargeting('age_max', e.target.value)}
-                              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                            />
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 12 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Gender</div>
-                            <select
-                              value={(() => {
-                                let t = editData.targeting;
-                                if (typeof t === 'string') try { t = JSON.parse(t); } catch (e) { t = {}; }
-                                return t?.genders?.[0] || '0';
-                              })()}
-                              onChange={(e) => updateTargeting('gender', e.target.value)}
-                              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                            >
-                              <option value="0">All</option>
-                              <option value="1">Male</option>
-                              <option value="2">Female</option>
-                            </select>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>End Date (Optional)</div>
-                            <input
-                              type="datetime-local"
-                              value={editData.end_time ? new Date(editData.end_time).toISOString().slice(0, 16) : ""}
-                              onChange={(e) => {
-                                const newDate = e.target.value ? new Date(e.target.value).toISOString() : null;
-                                setEditData({ ...editData, end_time: newDate });
-                              }}
-                              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", outline: "none", fontSize: 14 }}
-                            />
-                          </div>
+                        <FieldRow label="End Date (optional)">
+                          <input type="datetime-local"
+                            value={editData.end_time ? new Date(editData.end_time).toISOString().slice(0, 16) : ""}
+                            onChange={(e) => setEditData({ ...editData, end_time: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                            style={inpSt} />
+                        </FieldRow>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", background: "#f8fafc", borderRadius: 8, padding: "8px 12px" }}>
+                          🔒 Objective and budget type (daily/lifetime) cannot be changed after creation.
                         </div>
                       </>
                     )}
 
-                    <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                      <button
-                        onClick={() => setEditModalOpen(false)}
-                        style={{ flex: 1, padding: 12, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", cursor: "pointer", fontWeight: 600, color: "var(--text)" }}
-                      >Cancel</button>
-                      <button
-                        onClick={saveEdit}
-                        disabled={editSaving}
-                        style={{ flex: 1, padding: 12, borderRadius: 8, background: "var(--primary)", border: "none", cursor: editSaving ? "default" : "pointer", fontWeight: 600, color: "#fff", display: "flex", justifyContent: "center", alignItems: "center", gap: 8, opacity: editSaving ? 0.7 : 1 }}
-                      >
+                    {/* ── AD SET fields ── */}
+                    {editType === "AdSet" && (
+                      <>
+                        <FieldRow label="Ad Set Name">
+                          <input type="text" value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} style={inpSt} />
+                        </FieldRow>
+
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Daily Budget ($)" hint="Leave blank to keep current">
+                            <input type="number" min="1" step="0.01"
+                              value={editData._daily_budget_dollars ?? (editData.daily_budget ? (editData.daily_budget / 100).toFixed(2) : "")}
+                              onChange={(e) => setEditData({ ...editData, _daily_budget_dollars: e.target.value })}
+                              placeholder="e.g. 10.00" style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="Lifetime Budget ($)" hint="Leave blank to keep current">
+                            <input type="number" min="1" step="0.01"
+                              value={editData._lifetime_budget_dollars ?? (editData.lifetime_budget ? (editData.lifetime_budget / 100).toFixed(2) : "")}
+                              onChange={(e) => setEditData({ ...editData, _lifetime_budget_dollars: e.target.value })}
+                              placeholder="e.g. 100.00" style={inpSt} />
+                          </FieldRow>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Start Date">
+                            <input type="datetime-local"
+                              value={editData.start_time ? new Date(editData.start_time).toISOString().slice(0, 16) : ""}
+                              onChange={(e) => setEditData({ ...editData, start_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                              style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="End Date">
+                            <input type="datetime-local"
+                              value={editData.end_time ? new Date(editData.end_time).toISOString().slice(0, 16) : ""}
+                              onChange={(e) => setEditData({ ...editData, end_time: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                              style={inpSt} />
+                          </FieldRow>
+                        </div>
+
+                        <FieldRow label="Countries (comma-separated, e.g. CA, US, TR)">
+                          <input type="text"
+                            value={(() => { let t = editData.targeting; if (typeof t === 'string') try { t = JSON.parse(t); } catch { t = {}; } return t?.geo_locations?.countries?.join(', ') || ""; })()}
+                            onChange={(e) => updateTargeting('countries', e.target.value)}
+                            placeholder="CA, US" style={inpSt} />
+                        </FieldRow>
+
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Age Min">
+                            <input type="number" min="18" max="65"
+                              value={(() => { let t = editData.targeting; if (typeof t === 'string') try { t = JSON.parse(t); } catch { t = {}; } return t?.age_min || 18; })()}
+                              onChange={(e) => updateTargeting('age_min', e.target.value)} style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="Age Max">
+                            <input type="number" min="18" max="65"
+                              value={(() => { let t = editData.targeting; if (typeof t === 'string') try { t = JSON.parse(t); } catch { t = {}; } return t?.age_max || 65; })()}
+                              onChange={(e) => updateTargeting('age_max', e.target.value)} style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="Gender">
+                            <select value={(() => { let t = editData.targeting; if (typeof t === 'string') try { t = JSON.parse(t); } catch { t = {}; } return t?.genders?.[0] || '0'; })()} onChange={(e) => updateTargeting('gender', e.target.value)} style={inpSt}>
+                              <option value="0">All</option>
+                              <option value="1">Male</option>
+                              <option value="2">Female</option>
+                            </select>
+                          </FieldRow>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Bid Strategy">
+                            <select value={editData.bid_strategy || ""} onChange={(e) => setEditData({ ...editData, bid_strategy: e.target.value })} style={inpSt}>
+                              <option value="">Keep current</option>
+                              <option value="LOWEST_COST_WITHOUT_CAP">Lowest Cost (auto)</option>
+                              <option value="COST_CAP">Cost Cap</option>
+                              <option value="LOWEST_COST_WITH_BID_CAP">Bid Cap</option>
+                            </select>
+                          </FieldRow>
+                          <FieldRow label="Bid Amount ($)" hint="Required for Cost Cap / Bid Cap">
+                            <input type="number" min="0.01" step="0.01"
+                              value={editData.bid_amount || ""}
+                              onChange={(e) => setEditData({ ...editData, bid_amount: e.target.value })}
+                              placeholder="e.g. 2.50" style={inpSt} />
+                          </FieldRow>
+                        </div>
+
+                        <FieldRow label="Optimization Goal">
+                          <select value={editData.optimization_goal || ""} onChange={(e) => setEditData({ ...editData, optimization_goal: e.target.value })} style={inpSt}>
+                            <option value="">Keep current</option>
+                            <option value="LINK_CLICKS">Link Clicks</option>
+                            <option value="LANDING_PAGE_VIEWS">Landing Page Views</option>
+                            <option value="IMPRESSIONS">Impressions</option>
+                            <option value="REACH">Reach</option>
+                            <option value="VIDEO_VIEWS">Video Views</option>
+                            <option value="POST_ENGAGEMENT">Post Engagement</option>
+                            <option value="OFFSITE_CONVERSIONS">Conversions (requires Pixel)</option>
+                          </select>
+                        </FieldRow>
+
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
+                          ⚠️ Changing targeting, bid strategy, or optimization goal will reset Meta's learning phase (3–5 days to restabilize).
+                        </div>
+                      </>
+                    )}
+
+                    {/* ── AD fields ── */}
+                    {editType === "Ad" && (
+                      <>
+                        {editData.thumbnail_url && (
+                          <img src={editData.thumbnail_url} style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border)" }} alt="" />
+                        )}
+                        <FieldRow label="Ad Name">
+                          <input type="text" value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} style={inpSt} />
+                        </FieldRow>
+                        <FieldRow label="Headline">
+                          <input type="text" value={editData.headline || ""} onChange={(e) => setEditData({ ...editData, headline: e.target.value })} placeholder="e.g. Save 60% on dental care abroad" style={inpSt} />
+                        </FieldRow>
+                        <FieldRow label="Primary Text (Ad Body)">
+                          <textarea rows={3} value={editData.body || ""} onChange={(e) => setEditData({ ...editData, body: e.target.value })} placeholder="Ad copy / description" style={{ ...inpSt, resize: "vertical" }} />
+                        </FieldRow>
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <FieldRow label="Website URL">
+                            <input type="url" value={editData.link_url || ""} onChange={(e) => setEditData({ ...editData, link_url: e.target.value })} placeholder="https://..." style={inpSt} />
+                          </FieldRow>
+                          <FieldRow label="CTA Button">
+                            <select value={editData.cta_type || "LEARN_MORE"} onChange={(e) => setEditData({ ...editData, cta_type: e.target.value })} style={inpSt}>
+                              <option value="LEARN_MORE">Learn More</option>
+                              <option value="SHOP_NOW">Shop Now</option>
+                              <option value="SIGN_UP">Sign Up</option>
+                              <option value="CONTACT_US">Contact Us</option>
+                              <option value="GET_QUOTE">Get Quote</option>
+                              <option value="BOOK_TRAVEL">Book Travel</option>
+                              <option value="DOWNLOAD">Download</option>
+                              <option value="WATCH_MORE">Watch More</option>
+                              <option value="APPLY_NOW">Apply Now</option>
+                            </select>
+                          </FieldRow>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "8px 12px" }}>
+                          ✓ Saving creates a new creative with your updated text and points this ad to it. Meta will briefly re-review (2–30 min) before the updated ad goes live. Image/video cannot be changed here — create a new ad for that.
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10, marginTop: 4, position: "sticky", bottom: 0, background: "var(--surface)", paddingTop: 12 }}>
+                      <button onClick={() => setEditModalOpen(false)} style={{ flex: 1, padding: 12, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", cursor: "pointer", fontWeight: 600, color: "var(--text)" }}>Cancel</button>
+                      <button onClick={saveEdit} disabled={editSaving}
+                        style={{ flex: 1, padding: 12, borderRadius: 8, background: "var(--primary)", border: "none", cursor: editSaving ? "default" : "pointer", fontWeight: 600, color: "#fff", display: "flex", justifyContent: "center", alignItems: "center", gap: 8, opacity: editSaving ? 0.7 : 1 }}>
                         {editSaving ? <Spinner size={16} /> : "Save Changes"}
                       </button>
                     </div>
@@ -5749,7 +5864,8 @@ export default function Dashboard() {
                 ) : null}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
