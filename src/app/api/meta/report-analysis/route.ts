@@ -91,19 +91,22 @@ export async function GET(req: NextRequest) {
     const adsToAnalyse = filtered.length > 0 ? filtered : adsRaw;
 
     // ── Step 5: Fetch Supabase creative data ──
+    // Use select("*") so we don't break if optional columns (story) don't exist yet
     interface SbRow {
       id: string;
       text: string;
-      story: string | null;
+      story?: string | null;
+      Story?: string | null;  // handle capitalised variant
       format: string;
       "json data": string | Record<string, unknown> | null;
+      [key: string]: unknown;
     }
     let sbRows: SbRow[] = [];
     try {
       const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
       const { data } = await sb
         .from("your_name_table")
-        .select(`id, text, story, format, "json data"`)
+        .select("*")
         .order("time", { ascending: false })
         .limit(300);
       sbRows = (data as SbRow[]) || [];
@@ -165,7 +168,7 @@ export async function GET(req: NextRequest) {
         cta: (sbAd.call_to_action_type as string) || (creative.call_to_action_type as string) || "",
         image_url: (creative.image_url as string) || (creative.thumbnail_url as string) || "",
         media_url: sbRow?.text || (creative.thumbnail_url as string) || (creative.image_url as string) || "",
-        story: sbRow?.story || "",
+        story: (sbRow?.story || sbRow?.Story || sbRow?.["Story"] || "") as string,
         spend: parseFloat((ins.spend as string) || "0"),
         impressions: parseInt((ins.impressions as string) || "0", 10),
         clicks: parseInt((ins.inline_link_clicks as string) || "0", 10),
