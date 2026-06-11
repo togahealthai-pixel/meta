@@ -6118,11 +6118,18 @@ export default function Dashboard() {
                   <button
                     onClick={() => {
                       const html = generateReportHTML(reportResult, reportFilter, reportNote);
-                      const win = window.open('', '_blank');
-                      if (!win) { alert('Allow pop-ups to download the PDF report'); return; }
-                      win.document.write(html);
-                      win.document.close();
-                      setTimeout(() => win.print(), 400);
+                      const iframe = document.createElement('iframe');
+                      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';
+                      document.body.appendChild(iframe);
+                      const doc = iframe.contentDocument || (iframe.contentWindow as any)?.document;
+                      if (!doc) return;
+                      doc.open(); doc.write(html); doc.close();
+                      const cleanup = () => { try { document.body.removeChild(iframe); } catch { /**/ } };
+                      setTimeout(() => {
+                        try { (iframe.contentWindow as any).focus(); (iframe.contentWindow as any).print(); }
+                        catch { /**/ }
+                        setTimeout(cleanup, 2000);
+                      }, 500);
                     }}
                     style={{
                       padding: '9px 22px', borderRadius: 'var(--radius-md)', border: 'none',

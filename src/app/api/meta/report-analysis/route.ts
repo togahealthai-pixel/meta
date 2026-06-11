@@ -281,35 +281,101 @@ Return ONLY valid JSON — no markdown, no extra text:
   "overall_recommendation": "The single highest-ROI action right now — specific ad name, exact budget move, expected outcome"
 }`;
 
+    // Rule-based fallback used when OpenAI is unavailable
+    function ruleBasedAnalysis() {
+      const topName = top[0]?.name || "your top ad";
+      const overview = `Your account has ${ads.length} ads with $${totalSpend.toFixed(2)} total spend and an avg CTR of ${avgCtr.toFixed(2)}%. "${topName}" is the strongest performer (score ${top[0]?.score ?? 0}/100). The ${under.length} underperforming ads have 0% CTR and need fresh creative hooks before any additional spend.`;
+      const insights: string[] = [
+        top[0] ? `"${top[0].name}" is your only ad generating clicks (score ${top[0].score}/100) — concentrate budget here until other creatives are updated` : "No clear winner yet — run A/B tests with 2–3 different hook styles",
+        `${under.filter((a) => a.spend === 0).length} ads have never received any spend — reactivate with $5/day test budgets and new hooks`,
+        avgCtr < 0.5
+          ? "Avg CTR below 0.5% suggests weak first-frame hooks — focus all creative energy on the opening 3 seconds of each video"
+          : "CTR is at benchmark — scale winners and cut ads that haven't clicked in 7 days",
+      ];
+      const topNotes = top.map((a) => ({
+        ad_id: a.id,
+        ad_name: a.name,
+        why_performing: a.ctr > 0
+          ? `CTR of ${a.ctr.toFixed(2)}% is the highest in the account. ${a.headline ? `Headline "${a.headline.slice(0, 60)}" is resonating — it likely hits a clear pain point or benefit.` : "The creative format (video vs image) is matching audience expectations."} Increase this ad's budget.`
+          : `Ranked #1 by composite score. Increase budget to $15/day to generate enough data for a reliable CTR read.`,
+      }));
+      const underSugg = under.map((a) => {
+        let issue = "", headline = "", body = "", cta = "", targeting = "", budget = "";
+        const camp = a.campaign_name.split(" ")[0] || "health";
+        if (a.impressions === 0 && a.spend === 0) {
+          issue = "Ad has never served — campaign is paused or ad set budget is zero";
+          headline = `Try: "How [City] residents are saving 60% on ${camp} abroad — without compromising care"`;
+          body = "Line 1: state the problem your audience has. Line 2: introduce the solution with a specific number or result. Line 3: low-friction CTA. Keep it under 90 words.";
+          cta = "LEARN_MORE";
+          targeting = "Activate with Advantage+ audience, Reels + Feed placements, 1% lookalike of website visitors, age 30–55";
+          budget = "Start at $5/day for 3 days to gather impression data — do not judge CTR before 500 impressions";
+        } else if (a.ctr === 0 && a.spend > 0) {
+          issue = `Spent $${a.spend.toFixed(2)} with zero clicks — the first 3 seconds are not stopping the scroll`;
+          headline = a.headline
+            ? `Current: "${a.headline.slice(0, 50)}" — replace with a bold question or shocking stat, e.g. "Are you paying 3× too much for ${camp}?"`
+            : `Try: "The #1 mistake ${camp} patients make before booking treatment abroad"`;
+          body = a.body
+            ? `Current copy starts with "${a.body.slice(0, 40)}..." — rewrite to open with the transformation, not the service. Example: "Sarah cut her dental bill from $12k to $3k — here's her exact process."`
+            : "Open with a relatable pain point. Sentence 2: specific proof point or stat. Sentence 3: clear next step.";
+          cta = "LEARN_MORE";
+          targeting = "Switch from broad to 1% lookalike of website visitors or video viewers. Test age 28–50, interest in medical tourism or cosmetic procedures.";
+          budget = `Pause this ad now. Move its $${a.spend.toFixed(2)} budget to "${top[0]?.name || "top performer"}" which is generating real clicks.`;
+        } else {
+          issue = "Below-average CTR — creative hook or audience match needs improvement";
+          headline = `Replace current headline with urgency or curiosity: "Only [X] consultation slots left this month for ${camp} patients"`;
+          body = "Lead with the viewer's desired outcome (not your service). Add 1 line of social proof. End with a benefit-focused CTA.";
+          cta = "BOOK_TRAVEL";
+          targeting = "Narrow audience: interests = medical tourism + health treatments, age 30–55, exclude existing page engagers. Test Reels-only placement.";
+          budget = "Hold current budget for 5 more days. If CTR stays below 0.3%, pause and refresh the creative before reactivating.";
+        }
+        return { ad_id: a.id, ad_name: a.name, issue, headline_suggestion: headline, body_suggestion: body, cta_suggestion: cta, targeting_suggestion: targeting, budget_suggestion: budget };
+      });
+      const rec = top[0]
+        ? `Immediately increase "${top[0].name}" budget to $15–20/day — it's your only converting ad and every dollar there returns measurable clicks. Pause the ${under.length} zero-CTR ads, refresh their hooks using the suggestions above, then reactivate at $5/day each.`
+        : `All ads need creative testing. Launch 2–3 hook variations at $5/day each, measure CTR after 3 days, kill anything below 0.3%, and double down on the winner.`;
+      return { ai_overview: overview, key_insights: insights, top_performer_notes: topNotes, underperformer_suggestions: underSugg, overall_recommendation: rec };
+    }
+
     let ai: Record<string, unknown> = {};
     let aiError = "";
-    for (const model of ["gpt-4o", "gpt-4-turbo"]) {
-      try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-          body: JSON.stringify({
-            model,
-            response_format: { type: "json_object" },
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3,
-            max_tokens: 4000,
-          }),
-        });
-        if (!r.ok) {
-          const errText = await r.text();
-          throw new Error(`OpenAI ${r.status}: ${errText.slice(0, 200)}`);
+    if (OPENAI_KEY) {
+      for (const model of ["gpt-4o", "gpt-4-turbo"]) {
+        try {
+          const r = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+            body: JSON.stringify({
+              model,
+              response_format: { type: "json_object" },
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.3,
+              max_tokens: 4000,
+            }),
+          });
+          if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(`OpenAI ${r.status}: ${errText.slice(0, 200)}`);
+          }
+          const d = await r.json();
+          const content = d.choices?.[0]?.message?.content;
+          if (!content) throw new Error(`No content. Raw: ${JSON.stringify(d).slice(0, 200)}`);
+          ai = JSON.parse(content);
+          aiError = "";
+          break;
+        } catch (e) {
+          aiError = `[${model}] ${e instanceof Error ? e.message : String(e)}`;
+          console.error("[report-analysis GPT]", aiError);
         }
-        const d = await r.json();
-        const content = d.choices?.[0]?.message?.content;
-        if (!content) throw new Error(`No content in response. Raw: ${JSON.stringify(d).slice(0, 200)}`);
-        ai = JSON.parse(content);
-        aiError = "";
-        break;
-      } catch (e) {
-        aiError = `[${model}] ${e instanceof Error ? e.message : String(e)}`;
-        console.error("[report-analysis GPT]", aiError);
       }
+    } else {
+      aiError = "OPENAI_API_KEY not set in environment — using rule-based analysis";
+      console.warn("[report-analysis]", aiError);
+    }
+
+    // Fall back to rule-based analysis if GPT failed or key is missing
+    if (!ai.ai_overview) {
+      ai = ruleBasedAnalysis() as Record<string, unknown>;
+      if (aiError) aiError += " (rule-based fallback applied)";
     }
 
     return NextResponse.json({
