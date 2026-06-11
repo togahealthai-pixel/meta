@@ -92,6 +92,176 @@ const LOCATION_SUGGESTIONS = [
   { name: "Italy", shortcut: "IT", details: "Country in Europe" },
 ];
 
+// ─── REPORT HTML GENERATOR ───────────────────────────────────
+function generateReportHTML(result: any, filter: string, note: string): string {
+  const date = new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const s = result.summary;
+
+  const kpiRow = [
+    ["Total Ads", s.total_ads, "#3b82f6"],
+    ["Total Spend", `$${s.total_spend.toFixed(2)}`, "#0ea5e9"],
+    ["Impressions", s.total_impressions.toLocaleString(), "#f59e0b"],
+    ["Clicks", s.total_clicks.toLocaleString(), "#10b981"],
+    ["Avg CTR", `${s.avg_ctr.toFixed(2)}%`, "#8b5cf6"],
+    ["Avg CPM", `$${s.avg_cpm.toFixed(2)}`, "#64748b"],
+    ["Avg CPC", `$${s.avg_cpc.toFixed(2)}`, "#64748b"],
+  ].map(([label, val, color]) => `
+    <div style="background:#fff;border-radius:12px;padding:18px 20px;border:1px solid #e2e8f0;min-width:110px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${color};margin-bottom:6px;">${label}</div>
+      <div style="font-size:22px;font-weight:800;color:#0f172a;">${val}</div>
+    </div>`).join("");
+
+  const topRows = (result.top_performers || []).map((ad: any) => {
+    const note_obj = (result.top_performer_notes || []).find((n: any) => n.ad_id === ad.id);
+    const thumb = ad.media_url ? `<img src="${ad.media_url}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.style.display='none'"/>` : `<div style="width:52px;height:52px;border-radius:8px;background:#f1f5f9;flex-shrink:0;"></div>`;
+    return `
+    <div style="display:flex;gap:14px;align-items:flex-start;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      ${thumb}
+      <div style="flex:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:700;font-size:14px;color:#0f172a;">${ad.name}</span>
+          <span style="background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
+        </div>
+        <div style="font-size:12px;color:#475569;margin-bottom:6px;">CTR: <b>${ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>$${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>${ad.clicks}</b> &nbsp;|&nbsp; CPM: <b>${ad.cpm > 0 ? "$" + ad.cpm.toFixed(2) : "—"}</b></div>
+        ${note_obj?.why_performing ? `<div style="font-size:12px;color:#16a34a;font-style:italic;">✓ ${note_obj.why_performing}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  const underRows = (result.underperformers || []).map((ad: any) => {
+    const sugg = (result.underperformer_suggestions || []).find((s: any) => s.ad_id === ad.id);
+    const thumb = ad.media_url ? `<img src="${ad.media_url}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;flex-shrink:0;" onerror="this.style.display='none'"/>` : `<div style="width:52px;height:52px;border-radius:8px;background:#f1f5f9;flex-shrink:0;"></div>`;
+    const suggHTML = sugg ? [
+      ["Issue", sugg.issue, "#ef4444"],
+      ["New Headline", sugg.headline_suggestion, "#2563eb"],
+      ["New Ad Text", sugg.body_suggestion, "#2563eb"],
+      ["CTA", sugg.cta_suggestion, "#7c3aed"],
+      ["Targeting", sugg.targeting_suggestion, "#0891b2"],
+      ["Budget Action", sugg.budget_suggestion, "#d97706"],
+    ].filter(([,v]) => v).map(([label, val, color]) => `
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;margin-top:8px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${color};margin-bottom:3px;">${label}</div>
+        <div style="font-size:13px;color:#0f172a;line-height:1.5;">${val}</div>
+      </div>`).join("") : "";
+    return `
+    <div style="background:#fff7f7;border:1px solid #fecaca;border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        ${thumb}
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:14px;color:#0f172a;">${ad.name}</span>
+            <span style="background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
+          </div>
+          <div style="font-size:12px;color:#475569;">CTR: <b>${ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>$${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>${ad.clicks}</b></div>
+        </div>
+      </div>
+      ${suggHTML}
+    </div>`;
+  }).join("");
+
+  const allAdsRows = (result.all_ads || []).map((ad: any, i: number) => {
+    const bg = i % 2 === 0 ? "#fff" : "#f8fafc";
+    const statusColor = ad.status === "ACTIVE" ? "#16a34a" : ad.status === "PAUSED" ? "#d97706" : "#64748b";
+    const scoreColor = ad.score >= 60 ? "#16a34a" : ad.score >= 25 ? "#d97706" : "#dc2626";
+    return `<tr style="background:${bg};">
+      <td style="padding:10px 14px;font-weight:600;font-size:13px;">${ad.name}</td>
+      <td style="padding:10px 14px;font-size:12px;color:#64748b;">${ad.campaign_name}</td>
+      <td style="padding:10px 14px;"><span style="font-size:11px;font-weight:700;color:${statusColor};background:${statusColor}15;padding:2px 8px;border-radius:20px;">${ad.status}</span></td>
+      <td style="padding:10px 14px;text-align:center;font-weight:800;color:${scoreColor};">${ad.score}</td>
+      <td style="padding:10px 14px;text-align:right;">$${ad.spend.toFixed(2)}</td>
+      <td style="padding:10px 14px;text-align:right;">${ad.impressions.toLocaleString()}</td>
+      <td style="padding:10px 14px;text-align:right;">${ad.clicks}</td>
+      <td style="padding:10px 14px;text-align:right;color:#2563eb;font-weight:600;">${ad.ctr.toFixed(2)}%</td>
+      <td style="padding:10px 14px;text-align:right;">${ad.cpc > 0 ? "$" + ad.cpc.toFixed(2) : "—"}</td>
+      <td style="padding:10px 14px;text-align:right;">${ad.cpm > 0 ? "$" + ad.cpm.toFixed(2) : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const insightsList = (result.key_insights || []).map((ins: string, i: number) =>
+    `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#3b82f6;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">${i+1}</div>
+      <div style="font-size:14px;color:#1e293b;line-height:1.6;">${ins}</div>
+    </div>`
+  ).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Meta Ads Report — ${date}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; }
+  @media print { body { background: #fff; } .no-print { display: none; } }
+  h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; color: #0f172a; }
+  h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .section { background: #fff; border-radius: 16px; padding: 24px 28px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  th:not(:first-child):not(:nth-child(2)) { text-align: right; }
+  td { border-bottom: 1px solid #f1f5f9; }
+</style>
+</head>
+<body>
+<div style="max-width:1000px;margin:0 auto;padding:32px 20px;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1e40af,#0ea5e9);border-radius:16px;padding:28px 32px;margin-bottom:24px;color:#fff;">
+    <div style="font-size:12px;font-weight:600;opacity:.75;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Toga Health AI</div>
+    <div style="font-size:26px;font-weight:800;margin-bottom:4px;">Meta Ads Performance Report</div>
+    <div style="font-size:13px;opacity:.8;">${date} &nbsp;·&nbsp; Filter: ${filter === "both" ? "All Ads" : filter === "live" ? "Live Ads" : "Paused Ads"} &nbsp;·&nbsp; Period: Last 30 Days${note ? ` &nbsp;·&nbsp; Note: ${note}` : ""}</div>
+  </div>
+
+  <!-- KPIs -->
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">${kpiRow}</div>
+
+  <!-- AI Overview -->
+  <div class="section" style="border-left:4px solid #3b82f6;background:#eff6ff;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#3b82f6;margin-bottom:8px;">AI Overview</div>
+    <div style="font-size:15px;line-height:1.7;color:#1e293b;">${result.ai_overview || ""}</div>
+    ${result.overall_recommendation ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid #bfdbfe;font-size:13px;color:#1d4ed8;font-weight:600;">→ ${result.overall_recommendation}</div>` : ""}
+  </div>
+
+  <!-- Key Insights -->
+  ${insightsList ? `<div class="section"><h2>Key Insights</h2>${insightsList}</div>` : ""}
+
+  <!-- Top + Under side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="section" style="padding:20px;">
+      <h2 style="color:#16a34a;">🏆 Top Performers</h2>
+      ${topRows || "<p style='color:#64748b;font-size:13px;'>No top performers yet.</p>"}
+    </div>
+    <div class="section" style="padding:20px;">
+      <h2 style="color:#dc2626;">⚠️ Needs Improvement</h2>
+      ${underRows || "<p style='color:#64748b;font-size:13px;'>No underperformers.</p>"}
+    </div>
+  </div>
+
+  <!-- All Ads Table -->
+  <div class="section">
+    <h2>All Ads Performance</h2>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>Ad Name</th><th>Campaign</th><th>Status</th><th style="text-align:center;">Score</th>
+          <th style="text-align:right;">Spend</th><th style="text-align:right;">Impr.</th><th style="text-align:right;">Clicks</th>
+          <th style="text-align:right;">CTR</th><th style="text-align:right;">CPC</th><th style="text-align:right;">CPM</th>
+        </tr></thead>
+        <tbody>${allAdsRows}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;font-size:12px;color:#94a3b8;padding:16px 0;">
+    Generated by Toga Health AI · ${date}
+  </div>
+</div>
+</body>
+</html>`;
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────
 /**
  * Ensures Supabase storage URLs use the current project's hostname.
@@ -5924,207 +6094,83 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* ── Results ── */}
+          {/* ── Results: Report Ready card ── */}
           {reportResult && !reportLoading && (
-            <>
-              {/* Summary KPI cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-                {[
-                  { label: "Total Ads", value: reportResult.summary.total_ads, color: "var(--primary)", bg: "var(--primary-light)" },
-                  { label: "Total Spend", value: `$${reportResult.summary.total_spend.toFixed(2)}`, color: "var(--blue)", bg: "var(--blue-light)" },
-                  { label: "Impressions", value: reportResult.summary.total_impressions.toLocaleString(), color: "var(--amber)", bg: "var(--amber-light)" },
-                  { label: "Clicks", value: reportResult.summary.total_clicks.toLocaleString(), color: "var(--green)", bg: "var(--green-light)" },
-                  { label: "Avg CTR", value: `${reportResult.summary.avg_ctr.toFixed(2)}%`, color: "var(--primary)", bg: "var(--primary-light)" },
-                  { label: "Avg CPM", value: `$${reportResult.summary.avg_cpm.toFixed(2)}`, color: "var(--text-muted)", bg: "var(--surface)" },
-                  { label: "Avg CPC", value: `$${reportResult.summary.avg_cpc.toFixed(2)}`, color: "var(--text-muted)", bg: "var(--surface)" },
-                ].map(m => (
-                  <MetricCard key={m.label} label={m.label} value={m.value} color={m.color} bg={m.bg} />
-                ))}
-              </div>
-
-              {/* AI Overview */}
-              {reportResult.ai_overview && (
-                <Card style={{ borderLeft: "4px solid var(--primary)", background: "var(--primary-light)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>AI Overview</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text)" }}>{reportResult.ai_overview}</div>
-                  {reportResult.overall_recommendation && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(2,132,199,0.15)", fontSize: 13, color: "var(--primary)", fontWeight: 600 }}>
-                      → {reportResult.overall_recommendation}
+            <Card style={{ padding: '32px 28px', border: '1.5px solid var(--primary)', background: 'var(--primary-light)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontSize: 24 }}>✅</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary)' }}>Report Ready</div>
                     </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Key Insights */}
-              {reportResult.key_insights?.length > 0 && (
-                <Card>
-                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Key Insights</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {reportResult.key_insights.map((insight: string, i: number) => (
-                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--primary-light)", color: "var(--primary)", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                          {i + 1}
-                        </div>
-                        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.5 }}>{insight}</div>
-                      </div>
-                    ))}
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 480, lineHeight: 1.6 }}>
+                      {reportResult.ai_overview || 'Analysis complete.'}
+                    </div>
                   </div>
-                </Card>
-              )}
+                  <button
+                    onClick={() => {
+                      const html = generateReportHTML(reportResult, reportFilter, reportNote);
+                      const blob = new Blob([html], { type: 'text/html' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `meta-ads-report-${new Date().toISOString().split('T')[0]}.html`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    style={{
+                      padding: '11px 28px', borderRadius: 'var(--radius-md)', border: 'none',
+                      background: 'var(--primary)', color: '#fff', fontSize: 14, fontWeight: 700,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+                      boxShadow: '0 4px 16px rgba(2,132,199,0.3)', transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#0369a1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--primary)'; }}
+                  >
+                    ⬇ Download HTML Report
+                  </button>
+                </div>
 
-              {/* Top Performers + Underperformers */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                {/* Top Performers */}
-                {reportResult.top_performers?.length > 0 && (
-                  <Card style={{ padding: 0, overflow: "hidden" }}>
-                    <div style={{ padding: "14px 18px", background: "var(--green-light)", borderBottom: "1px solid var(--border-light)", display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontSize: 16 }}>🏆</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--green)" }}>Top Performers</div>
+                {/* KPI strip */}
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Total Ads', value: reportResult.summary.total_ads },
+                    { label: 'Total Spend', value: `$${reportResult.summary.total_spend.toFixed(2)}` },
+                    { label: 'Impressions', value: reportResult.summary.total_impressions.toLocaleString() },
+                    { label: 'Avg CTR', value: `${reportResult.summary.avg_ctr.toFixed(2)}%` },
+                    { label: 'Avg CPM', value: `$${reportResult.summary.avg_cpm.toFixed(2)}` },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '10px 16px', border: '1px solid rgba(2,132,199,0.15)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--primary)', marginBottom: 3 }}>{m.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{m.value}</div>
                     </div>
-                    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                      {reportResult.top_performers.map((ad: any, i: number) => {
-                        const note = reportResult.top_performer_notes?.find((n: any) => n.ad_id === ad.id);
-                        const isVideo = ad.media_url && (ad.media_url.includes(".mp4") || ad.media_url.includes(".mov") || ad.media_url.includes(".webm"));
-                        return (
-                          <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
-                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                              {/* Thumbnail */}
-                              {ad.media_url && (
-                                <a href={ad.media_url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                                  <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)" }}>
-                                    {isVideo
-                                      ? <video src={ad.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
-                                      : <img src={ad.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                                  </div>
-                                </a>
-                              )}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</div>
-                                  <Badge text={`Score: ${ad.score}`} color="var(--green)" bg="var(--green-light)" />
-                                </div>
-                                <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--text-muted)", marginBottom: 4, flexWrap: "wrap" }}>
-                                  <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
-                                  <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
-                                  <span>Clicks: <strong style={{ color: "var(--text)" }}>{ad.clicks}</strong></span>
-                                </div>
-                                {note?.why_performing && (
-                                  <div style={{ fontSize: 12, color: "var(--green)", fontStyle: "italic" }}>{note.why_performing}</div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
+                  ))}
+                </div>
+
+                {/* Overall recommendation */}
+                {reportResult.overall_recommendation && (
+                  <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: '12px 16px', border: '1px solid rgba(2,132,199,0.2)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginRight: 8 }}>TOP ACTION →</span>
+                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{reportResult.overall_recommendation}</span>
+                  </div>
                 )}
 
-                {/* Underperformers with AI suggestions */}
-                {reportResult.underperformers?.length > 0 && (
-                  <Card style={{ padding: 0, overflow: "hidden" }}>
-                    <div style={{ padding: "14px 18px", background: "var(--red-light)", borderBottom: "1px solid var(--border-light)", display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontSize: 16 }}>⚠️</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--red-strong)" }}>Needs Improvement</div>
-                    </div>
-                    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                      {reportResult.underperformers.map((ad: any) => {
-                        const sugg = reportResult.underperformer_suggestions?.find((s: any) => s.ad_id === ad.id);
-                        const isVideo = ad.media_url && (ad.media_url.includes(".mp4") || ad.media_url.includes(".mov") || ad.media_url.includes(".webm"));
-                        return (
-                          <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
-                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
-                              {ad.media_url && (
-                                <a href={ad.media_url} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                                  <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)" }}>
-                                    {isVideo
-                                      ? <video src={ad.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
-                                      : <img src={ad.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                                  </div>
-                                </a>
-                              )}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</div>
-                                  <Badge text={`Score: ${ad.score}`} color="var(--red-strong)" bg="var(--red-light)" />
-                                </div>
-                                <div style={{ display: "flex", gap: 10, fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
-                                  <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
-                                  <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
-                                  <span>CPC: <strong style={{ color: "var(--text)" }}>${ad.cpc > 0 ? ad.cpc.toFixed(2) : "—"}</strong></span>
-                                </div>
-                              </div>
-                            </div>
-                            {sugg && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                {sugg.issue && (
-                                  <div style={{ fontSize: 12, color: "var(--red-strong)", fontWeight: 600, marginBottom: 2 }}>Issue: {sugg.issue}</div>
-                                )}
-                                {[
-                                  { label: "Headline", value: sugg.headline_suggestion },
-                                  { label: "Ad Text", value: sugg.body_suggestion },
-                                  { label: "CTA", value: sugg.cta_suggestion },
-                                  { label: "Targeting", value: sugg.targeting_suggestion },
-                                  { label: "Budget", value: sugg.budget_suggestion },
-                                ].filter(s => s.value).map(s => (
-                                  <div key={s.label} style={{ background: "#fff", border: "1px solid var(--border-light)", borderRadius: 8, padding: "7px 10px" }}>
-                                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>{s.label}</div>
-                                    <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>{s.value}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-                )}
+                {/* Regenerate */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <button
+                    onClick={() => { setReportResult(null); setReportError(''); }}
+                    style={{ padding: '7px 16px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border)', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    ↺ New Analysis
+                  </button>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Download opens the full report with all ads, AI suggestions, and improvement actions.</span>
+                </div>
               </div>
-
-              {/* Full Ads Table */}
-              {reportResult.all_ads?.length > 0 && (
-                <Card style={{ padding: 0, overflow: "hidden" }}>
-                  <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border-light)", background: "var(--surface)" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>All Ads Performance</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>Sorted by performance score</div>
-                  </div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ background: "var(--surface)" }}>
-                          {["Ad Name", "Campaign", "Status", "Score", "Spend", "Impressions", "Clicks", "CTR", "CPC", "CPM"].map(h => (
-                            <th key={h} style={{ padding: "10px 14px", textAlign: h === "Ad Name" || h === "Campaign" ? "left" : "right", fontWeight: 700, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportResult.all_ads.map((ad: any, i: number) => (
-                          <tr key={ad.id} style={{ borderBottom: "1px solid var(--border-light)", background: i % 2 === 0 ? "#fff" : "var(--surface)" }}>
-                            <td style={{ padding: "12px 14px", fontWeight: 600, color: "var(--text)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</td>
-                            <td style={{ padding: "12px 14px", color: "var(--text-muted)", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.campaign_name}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>
-                              <Badge
-                                text={ad.status}
-                                color={ad.status === "ACTIVE" ? "var(--green)" : "var(--amber)"}
-                                bg={ad.status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"}
-                              />
-                            </td>
-                            <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: ad.score >= 60 ? "var(--green)" : ad.score >= 30 ? "var(--amber)" : "var(--red-strong)" }}>{ad.score}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>${ad.spend.toFixed(2)}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.impressions.toLocaleString()}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.clicks.toLocaleString()}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right", color: "var(--primary)", fontWeight: 600 }}>{ad.ctr.toFixed(2)}%</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.cpc > 0 ? `$${ad.cpc.toFixed(2)}` : "—"}</td>
-                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              )}
-            </>
+            </Card>
           )}
 
           {/* ── Empty state when no result and not loading ── */}

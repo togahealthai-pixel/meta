@@ -248,36 +248,37 @@ Each ad has:
 - "metrics": performance data for the reporting period
 - "score": 0–100 composite score (CTR 40% + clicks 30% + CPC efficiency 30%)
 
-Write highly specific suggestions referencing the actual headline/body/story content where available.
+Goal: help these ads go VIRAL and maximise CTR. Write scroll-stopping, emotionally compelling copy rewrites.
+Reference the actual headline/body/story content for every suggestion. Be brutally specific.
 
 Return ONLY valid JSON — no markdown, no extra text:
 {
-  "ai_overview": "2-3 sentences summarising account health, top opportunity, and biggest issue",
+  "ai_overview": "2-3 sentences on account health, the single biggest CTR opportunity, and what is holding performance back",
   "key_insights": [
-    "Insight referencing specific ad names and numbers",
-    "Insight about spend efficiency or audience behaviour",
-    "Insight about creative patterns that work vs don't"
+    "Specific insight with ad names and real numbers",
+    "Insight about what makes the top ad work vs others",
+    "Pattern or missed opportunity across all ads"
   ],
   "top_performer_notes": [
     {
       "ad_id": "<id>",
       "ad_name": "<name>",
-      "why_performing": "Specific reason — mention the headline/story/angle if available, explain what's driving the CTR or low CPC"
+      "why_performing": "Specific reason referencing its actual copy/hook/story and what psychological trigger it hits"
     }
   ],
   "underperformer_suggestions": [
     {
       "ad_id": "<id>",
       "ad_name": "<name>",
-      "issue": "Root cause of poor performance — be specific",
-      "headline_suggestion": "Rewritten headline that would resonate better (based on what the ad is about)",
-      "body_suggestion": "Rewritten primary text / description",
-      "cta_suggestion": "Best CTA enum e.g. LEARN_MORE / SHOP_NOW / BOOK_TRAVEL / SIGN_UP",
-      "targeting_suggestion": "Specific audience or placement adjustment",
-      "budget_suggestion": "Specific action: pause it / reduce budget to $X/day / reallocate to [top ad name]"
+      "issue": "Exact root cause — weak hook, wrong audience, low relevance score, no urgency, etc.",
+      "headline_suggestion": "Viral rewrite — use a number, bold claim, question, or fear/desire hook. E.g. '5 Canadians found a hack to cut medical bills by 60%'",
+      "body_suggestion": "Full rewritten primary text — conversational, benefit-led, social proof if possible, max 3 sentences",
+      "cta_suggestion": "LEARN_MORE / SHOP_NOW / BOOK_TRAVEL / SIGN_UP / CONTACT_US / GET_QUOTE — pick the most friction-free one",
+      "targeting_suggestion": "Specific audience change: lookalike %, interest category, age range, placement (Reels vs Feed)",
+      "budget_suggestion": "Concrete action: pause and reallocate $X to [best performer] / test at $5/day / increase to $15/day if CTR hits 0.5%"
     }
   ],
-  "overall_recommendation": "Single most impactful action to take right now, with specific ad name and dollar amount if relevant"
+  "overall_recommendation": "The single highest-ROI action right now — specific ad name, exact budget move, expected outcome"
 }`;
 
     let ai: Record<string, unknown> = {};
@@ -286,11 +287,11 @@ Return ONLY valid JSON — no markdown, no extra text:
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "gpt-4.1",
           response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
           temperature: 0.3,
-          max_tokens: 2500,
+          max_tokens: 3000,
         }),
       });
       const d = await r.json();
