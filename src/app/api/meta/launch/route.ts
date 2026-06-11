@@ -205,7 +205,7 @@ async function getOrCreatePixelId(accessToken, adAccountId) {
 }
 
 // ── STEP 2: Campaign ──
-async function createCampaign(existingCampaignId, adAccountId, accessToken, campaignName, objective, specialAdCats, isCbo, budgetType, dailyBudget, lifetimeBudget) {
+async function createCampaign(existingCampaignId, adAccountId, accessToken, campaignName, objective, specialAdCats, isCbo, budgetType, dailyBudget, lifetimeBudget, adStatus = "PAUSED") {
   if (existingCampaignId) return existingCampaignId;
 
   const campaignRes = await fetch(
@@ -216,7 +216,7 @@ async function createCampaign(existingCampaignId, adAccountId, accessToken, camp
       body: JSON.stringify({
         name: campaignName,
         objective,
-        status: "PAUSED",
+        status: adStatus,
         special_ad_categories: specialAdCats,
         // CBO (Advantage+ Budget ON): budget at campaign level — Meta enables CBO automatically, no flag needed
         // Non-CBO (Advantage+ Budget OFF): explicit flag=false required by Meta, budget goes on ad set instead
@@ -234,7 +234,7 @@ async function createCampaign(existingCampaignId, adAccountId, accessToken, camp
 }
 
 // ── STEP 3: Ad Set ──
-async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCbo, budgetType, dailyBudget, lifetimeBudget, startTime, stopTime, targeting, dsaFields, optimizationGoal, promotedObject) {
+async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCbo, budgetType, dailyBudget, lifetimeBudget, startTime, stopTime, targeting, dsaFields, optimizationGoal, promotedObject, adStatus = "PAUSED") {
   const bodyPayload: any = {
     name: adSetName,
     campaign_id: campaignId,
@@ -246,7 +246,7 @@ async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCb
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     targeting,
     ...dsaFields,
-    status: "PAUSED",
+    status: adStatus,
     access_token: accessToken,
   };
 
@@ -319,12 +319,12 @@ async function createAdCreative(adAccountId, accessToken, isVideo, pageId, media
 }
 
 // ── STEP 5: Ad ──
-async function createAd(adAccountId, accessToken, adName, adSetId, creativeId, trackingSpecs) {
+async function createAd(adAccountId, accessToken, adName, adSetId, creativeId, trackingSpecs, adStatus = "PAUSED") {
   const bodyPayload: any = {
     name: adName,
     adset_id: adSetId,
     creative: { creative_id: creativeId },
-    status: "PAUSED",
+    status: adStatus,
     access_token: accessToken,
   };
 
@@ -394,8 +394,10 @@ export async function POST(request) {
     const budgetType      = ad_set?.budget_type       || "DAILY";
     const dailyBudget     = ad_set?.daily_budget       || 5000;
     const lifetimeBudget  = ad_set?.lifetime_budget    || 50000;
-    const startTime       = ad_set?.start_time         || null;
+    const publishNow      = !!ad_set?.publish_immediately;
+    const startTime       = publishNow ? Math.floor(Date.now() / 1000) : (ad_set?.start_time || null);
     const stopTime        = ad_set?.has_end_date ? ad_set?.stop_time : null;
+    const adStatus        = publishNow ? "ACTIVE" : "PAUSED";
 
     const adSetName       = ad_set?.name              || "Ad Set";
     const ageMin          = ad_set?.age_min            || 18;
@@ -502,23 +504,23 @@ export async function POST(request) {
 
     // ── Sequential Tasks: Campaign -> Ad Set -> Creative -> Ad ──
     const campaignId = await createCampaign(
-      existingCampaignId, adAccountId, accessToken, campaignName, objective, 
-      specialAdCats, isCbo, budgetType, dailyBudget, lifetimeBudget
+      existingCampaignId, adAccountId, accessToken, campaignName, objective,
+      specialAdCats, isCbo, budgetType, dailyBudget, lifetimeBudget, adStatus
     );
 
     const adSetId = await createAdSet(
-      adAccountId, accessToken, adSetName, campaignId, isCbo, 
-      budgetType, dailyBudget, lifetimeBudget, startTime, stopTime, 
-      targeting, dsaFields, optimizationGoal, promotedObject
+      adAccountId, accessToken, adSetName, campaignId, isCbo,
+      budgetType, dailyBudget, lifetimeBudget, startTime, stopTime,
+      targeting, dsaFields, optimizationGoal, promotedObject, adStatus
     );
 
     const creativeId = await createAdCreative(
-      adAccountId, accessToken, isVideo, pageId, mediaPayload, 
+      adAccountId, accessToken, isVideo, pageId, mediaPayload,
       headline, primaryText, websiteUrl, ctaType, adName
     );
 
     const adId = await createAd(
-      adAccountId, accessToken, adName, adSetId, creativeId, trackingSpecs
+      adAccountId, accessToken, adName, adSetId, creativeId, trackingSpecs, adStatus
     );
 
     return Response.json({

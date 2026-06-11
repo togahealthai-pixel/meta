@@ -32,6 +32,7 @@ const DEFAULT_CONFIG: any = {
     start_time: "",
     stop_time: "",
     has_end_date: false,
+    publish_immediately: false,
     age_min: 18,
     age_max: 65,
     gender: 0,
@@ -283,7 +284,7 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!hasGeo) errs.push("At least one Target Location is required.");
       const budget = config.ad_set?.budget_type === "DAILY" ? config.ad_set?.daily_budget : config.ad_set?.lifetime_budget;
       if (!budget || Number(budget) <= 0) errs.push("Budget amount must be greater than 0.");
-      if (!config.ad_set?.start_time) errs.push("Start Date is required.");
+      if (!config.ad_set?.publish_immediately && !config.ad_set?.start_time) errs.push("Start Date is required. Or tick 'Post Immediately' to go live now.");
     }
     if (s === 3) {
       if (!config.ad?.name?.trim()) errs.push("Ad Name is required.");
@@ -563,8 +564,52 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                 </Label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* Post Immediately toggle */}
+                <div
+                  onClick={() => setField("ad_set", "publish_immediately", !config.ad_set?.publish_immediately)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                    borderRadius: 12, cursor: "pointer", userSelect: "none",
+                    background: config.ad_set?.publish_immediately ? "#f0fdf4" : "#f8fafc",
+                    border: `2px solid ${config.ad_set?.publish_immediately ? "#16a34a" : "#e2e8f0"}`,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                    border: `2px solid ${config.ad_set?.publish_immediately ? "#16a34a" : "#cbd5e1"}`,
+                    background: config.ad_set?.publish_immediately ? "#16a34a" : "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s",
+                  }}>
+                    {config.ad_set?.publish_immediately && (
+                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                        <path d="M1 4.5L4 7.5L10 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: config.ad_set?.publish_immediately ? "#16a34a" : "#374151" }}>
+                      Post Immediately
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
+                      Skip scheduling — ad goes directly to Meta review then live
+                    </div>
+                  </div>
+                </div>
+
                 <Label label="Start Date">
-                  <input type="datetime-local" value={config.ad_set?.start_time || ""} onChange={e => setField("ad_set", "start_time", e.target.value)} style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
+                  <input
+                    type="datetime-local"
+                    value={config.ad_set?.publish_immediately ? "" : (config.ad_set?.start_time || "")}
+                    onChange={e => setField("ad_set", "start_time", e.target.value)}
+                    disabled={!!config.ad_set?.publish_immediately}
+                    style={{
+                      ...inputSt, width: "100%", boxSizing: "border-box",
+                      opacity: config.ad_set?.publish_immediately ? 0.4 : 1,
+                      cursor: config.ad_set?.publish_immediately ? "not-allowed" : "text",
+                    }}
+                  />
                 </Label>
                 <Label label="End Date">
                   {config.ad_set?.has_end_date ? (
