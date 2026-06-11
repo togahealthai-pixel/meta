@@ -38,6 +38,7 @@ import {
   PieChart,
   Share2,
   Newspaper,
+  LineChart,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
@@ -59,12 +60,13 @@ const TABS = [
   { id: "campaigns", label: "Campaign Setup", icon: Settings2 },
   { id: "live_campaigns", label: "Running Campaign", icon: TrendingUp },
   { id: "reports", label: "Reports", icon: PieChart },
+  { id: "report_analysis", label: "Report Analysis", icon: LineChart },
   { id: "social-dash", label: "Social-Dash", icon: Share2 },
   { id: "newsletter", label: "Newsletter", icon: Newspaper, externalLink: "https://newsletter-weld-rho.vercel.app/newsletter/generate" },
   { id: "outreach", label: "Outreach", icon: Send, externalLink: "https://outreach-seven-phi.vercel.app" },
 ];
 
-const META_ADS_IDS = new Set(["overview", "create", "approval", "campaigns", "live_campaigns", "reports"]);
+const META_ADS_IDS = new Set(["overview", "create", "approval", "campaigns", "live_campaigns", "reports", "report_analysis"]);
 
 const TOPICS = [
   "Advanced Orthopedics",
@@ -517,6 +519,14 @@ export default function Dashboard() {
   const [metaReportsError, setMetaReportsError] = useState("");
   const [selectedCampaignForReports, setSelectedCampaignForReports] = useState(null);
 
+  // Report Analysis State
+  const [reportFilter, setReportFilter] = useState<"live" | "paused" | "both">("both");
+  const [reportNote, setReportNote] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportStep, setReportStep] = useState(0); // 0 = idle, 1–5 = progress
+  const [reportResult, setReportResult] = useState<any>(null);
+  const [reportError, setReportError] = useState("");
+
 
   function resetCreateTabWorkspace() {
     setCreateTabAdsConfig({
@@ -830,6 +840,56 @@ export default function Dashboard() {
     }
   }, []);
 
+
+  const REPORT_STEPS = [
+    "Connecting to Meta Graph API",
+    "Fetching campaigns & ad sets",
+    "Loading ad creatives & metrics",
+    "Running AI performance analysis",
+    "Generating recommendations",
+  ];
+
+  const handleRunReport = useCallback(async () => {
+    setReportLoading(true);
+    setReportError("");
+    setReportResult(null);
+    setReportStep(1);
+
+    // Simulate step progression while the API call runs
+    const stepTimers = [
+      setTimeout(() => setReportStep(2), 1200),
+      setTimeout(() => setReportStep(3), 2800),
+      setTimeout(() => setReportStep(4), 5000),
+    ];
+
+    try {
+      const params = new URLSearchParams({
+        filter: reportFilter,
+        note: reportNote,
+        date_preset: "last_30d",
+      });
+      const res = await fetch(`/api/meta/report-analysis?${params}`);
+      const data = await res.json();
+      stepTimers.forEach(clearTimeout);
+      if (!res.ok) {
+        setReportError(data.error || "Report analysis failed");
+        setReportStep(0);
+      } else {
+        setReportStep(5);
+        setTimeout(() => {
+          setReportResult(data);
+          setReportLoading(false);
+          setReportStep(6); // done
+        }, 600);
+        return;
+      }
+    } catch (e) {
+      stepTimers.forEach(clearTimeout);
+      setReportError("Failed to connect to report analysis API");
+      setReportStep(0);
+    }
+    setReportLoading(false);
+  }, [reportFilter, reportNote]);
 
   // On mount: if analysisStatus is "generating" but no sessionStorage flag,
   // it means the page was refreshed mid-analysis — reset to idle so user can re-trigger
@@ -5789,6 +5849,326 @@ export default function Dashboard() {
           </div>
         );
       })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          REPORT ANALYSIS — AI-Powered Ad Performance Analysis
+      ═══════════════════════════════════════════════════════ */}
+      {tab === "report_analysis" && (
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 120, paddingTop: 8 }}>
+          <div>
+            <SectionTitle style={{ marginBottom: 4 }}>Report Analysis</SectionTitle>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              AI-powered analysis of your Meta Ads performance with per-ad improvement suggestions.
+            </div>
+          </div>
+
+          {/* ── Error ── */}
+          {reportError && (
+            <Card style={{ background: "var(--red-light)", border: "1px solid var(--red-strong)" }}>
+              <div style={{ color: "var(--red-strong)", fontSize: 14 }}>{reportError}</div>
+            </Card>
+          )}
+
+          {/* ── Loading: animated progress timeline ── */}
+          {reportLoading && reportStep >= 1 && reportStep < 6 && (
+            <Card style={{ padding: "32px 28px" }}>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 24, color: "var(--text)" }}>Analysing your ads...</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {REPORT_STEPS.map((label, i) => {
+                  const stepNum = i + 1;
+                  const isDone = reportStep > stepNum;
+                  const isActive = reportStep === stepNum;
+                  const isPending = reportStep < stepNum;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                      {/* connector line */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 24, flexShrink: 0 }}>
+                        <div style={{
+                          width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, fontWeight: 700,
+                          background: isDone ? "var(--green)" : isActive ? "var(--primary)" : "var(--surface)",
+                          color: isDone || isActive ? "#fff" : "var(--text-muted)",
+                          border: isPending ? "2px solid var(--border)" : "none",
+                          transition: "all 0.4s ease",
+                          boxShadow: isActive ? "0 0 0 4px rgba(2,132,199,0.15)" : "none",
+                        }}>
+                          {isDone ? "✓" : stepNum}
+                        </div>
+                        {i < REPORT_STEPS.length - 1 && (
+                          <div style={{
+                            width: 2, height: 32, marginTop: 2,
+                            background: isDone ? "var(--green)" : "var(--border)",
+                            transition: "background 0.4s ease",
+                          }} />
+                        )}
+                      </div>
+                      <div style={{ paddingBottom: i < REPORT_STEPS.length - 1 ? 16 : 0 }}>
+                        <div style={{
+                          fontSize: 14, fontWeight: isActive ? 700 : 500,
+                          color: isDone ? "var(--green)" : isActive ? "var(--primary)" : "var(--text-muted)",
+                          transition: "all 0.3s",
+                          display: "flex", alignItems: "center", gap: 8
+                        }}>
+                          {label}
+                          {isActive && (
+                            <span style={{ display: "inline-block", width: 16, height: 16 }}>
+                              <Spinner size={14} color="var(--primary)" />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* ── Results ── */}
+          {reportResult && !reportLoading && (
+            <>
+              {/* Summary KPI cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+                {[
+                  { label: "Total Ads", value: reportResult.summary.total_ads, color: "var(--primary)", bg: "var(--primary-light)" },
+                  { label: "Total Spend", value: `$${reportResult.summary.total_spend.toFixed(2)}`, color: "var(--blue)", bg: "var(--blue-light)" },
+                  { label: "Impressions", value: reportResult.summary.total_impressions.toLocaleString(), color: "var(--amber)", bg: "var(--amber-light)" },
+                  { label: "Clicks", value: reportResult.summary.total_clicks.toLocaleString(), color: "var(--green)", bg: "var(--green-light)" },
+                  { label: "Avg CTR", value: `${reportResult.summary.avg_ctr.toFixed(2)}%`, color: "var(--primary)", bg: "var(--primary-light)" },
+                  { label: "Avg CPM", value: `$${reportResult.summary.avg_cpm.toFixed(2)}`, color: "var(--text-muted)", bg: "var(--surface)" },
+                  { label: "Avg CPC", value: `$${reportResult.summary.avg_cpc.toFixed(2)}`, color: "var(--text-muted)", bg: "var(--surface)" },
+                ].map(m => (
+                  <MetricCard key={m.label} label={m.label} value={m.value} color={m.color} bg={m.bg} />
+                ))}
+              </div>
+
+              {/* AI Overview */}
+              {reportResult.ai_overview && (
+                <Card style={{ borderLeft: "4px solid var(--primary)", background: "var(--primary-light)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>AI Overview</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text)" }}>{reportResult.ai_overview}</div>
+                  {reportResult.overall_recommendation && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(2,132,199,0.15)", fontSize: 13, color: "var(--primary)", fontWeight: 600 }}>
+                      → {reportResult.overall_recommendation}
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Key Insights */}
+              {reportResult.key_insights?.length > 0 && (
+                <Card>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Key Insights</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {reportResult.key_insights.map((insight: string, i: number) => (
+                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--primary-light)", color: "var(--primary)", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          {i + 1}
+                        </div>
+                        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.5 }}>{insight}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Top Performers + Underperformers */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {/* Top Performers */}
+                {reportResult.top_performers?.length > 0 && (
+                  <Card style={{ padding: 0, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 18px", background: "var(--green-light)", borderBottom: "1px solid var(--border-light)", display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontSize: 16 }}>🏆</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--green)" }}>Top Performers</div>
+                    </div>
+                    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {reportResult.top_performers.map((ad: any, i: number) => {
+                        const note = reportResult.top_performer_notes?.find((n: any) => n.ad_id === ad.id);
+                        return (
+                          <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{ad.name}</div>
+                              <Badge text={`Score: ${ad.score}`} color="var(--green)" bg="var(--green-light)" />
+                            </div>
+                            <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                              <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
+                              <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
+                              <span>Clicks: <strong style={{ color: "var(--text)" }}>{ad.clicks}</strong></span>
+                            </div>
+                            {note?.why_performing && (
+                              <div style={{ fontSize: 12, color: "var(--green)", fontStyle: "italic" }}>{note.why_performing}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Underperformers with AI suggestions */}
+                {reportResult.underperformers?.length > 0 && (
+                  <Card style={{ padding: 0, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 18px", background: "var(--red-light)", borderBottom: "1px solid var(--border-light)", display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontSize: 16 }}>⚠️</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--red-strong)" }}>Needs Improvement</div>
+                    </div>
+                    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {reportResult.underperformers.map((ad: any) => {
+                        const sugg = reportResult.underperformer_suggestions?.find((s: any) => s.ad_id === ad.id);
+                        return (
+                          <div key={ad.id} style={{ background: "var(--surface)", borderRadius: "var(--radius-md)", padding: "12px 14px", border: "1px solid var(--border-light)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{ad.name}</div>
+                              <Badge text={`Score: ${ad.score}`} color="var(--red-strong)" bg="var(--red-light)" />
+                            </div>
+                            <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                              <span>CTR: <strong style={{ color: "var(--text)" }}>{ad.ctr.toFixed(2)}%</strong></span>
+                              <span>Spend: <strong style={{ color: "var(--text)" }}>${ad.spend.toFixed(2)}</strong></span>
+                              <span>CPC: <strong style={{ color: "var(--text)" }}>${ad.cpc.toFixed(2)}</strong></span>
+                            </div>
+                            {sugg && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {sugg.issue && (
+                                  <div style={{ fontSize: 12, color: "var(--red-strong)", fontWeight: 600, marginBottom: 2 }}>Issue: {sugg.issue}</div>
+                                )}
+                                {[
+                                  { label: "Headline", value: sugg.headline_suggestion },
+                                  { label: "Ad Text", value: sugg.body_suggestion },
+                                  { label: "CTA", value: sugg.cta_suggestion },
+                                  { label: "Targeting", value: sugg.targeting_suggestion },
+                                  { label: "Budget", value: sugg.budget_suggestion },
+                                ].filter(s => s.value).map(s => (
+                                  <div key={s.label} style={{ background: "#fff", border: "1px solid var(--border-light)", borderRadius: 8, padding: "7px 10px" }}>
+                                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>{s.label}</div>
+                                    <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.5 }}>{s.value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                )}
+              </div>
+
+              {/* Full Ads Table */}
+              {reportResult.all_ads?.length > 0 && (
+                <Card style={{ padding: 0, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border-light)", background: "var(--surface)" }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>All Ads Performance</div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>Sorted by performance score</div>
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: "var(--surface)" }}>
+                          {["Ad Name", "Campaign", "Status", "Score", "Spend", "Impressions", "Clicks", "CTR", "CPC", "CPM"].map(h => (
+                            <th key={h} style={{ padding: "10px 14px", textAlign: h === "Ad Name" || h === "Campaign" ? "left" : "right", fontWeight: 700, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportResult.all_ads.map((ad: any, i: number) => (
+                          <tr key={ad.id} style={{ borderBottom: "1px solid var(--border-light)", background: i % 2 === 0 ? "#fff" : "var(--surface)" }}>
+                            <td style={{ padding: "12px 14px", fontWeight: 600, color: "var(--text)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.name}</td>
+                            <td style={{ padding: "12px 14px", color: "var(--text-muted)", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.campaign_name}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                              <Badge
+                                text={ad.status}
+                                color={ad.status === "ACTIVE" ? "var(--green)" : "var(--amber)"}
+                                bg={ad.status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"}
+                              />
+                            </td>
+                            <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: ad.score >= 60 ? "var(--green)" : ad.score >= 30 ? "var(--amber)" : "var(--red-strong)" }}>{ad.score}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>${ad.spend.toFixed(2)}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.impressions.toLocaleString()}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.clicks.toLocaleString()}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right", color: "var(--primary)", fontWeight: 600 }}>{ad.ctr.toFixed(2)}%</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.cpc > 0 ? `$${ad.cpc.toFixed(2)}` : "—"}</td>
+                            <td style={{ padding: "12px 14px", textAlign: "right" }}>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+            </>
+          )}
+
+          {/* ── Empty state when no result and not loading ── */}
+          {!reportResult && !reportLoading && !reportError && (
+            <Card>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>AI Report Analysis</div>
+                <div style={{ fontSize: 14, color: "var(--text-muted)", maxWidth: 400, lineHeight: 1.6 }}>
+                  Select a filter, add an optional note, and click <strong>Analyse</strong> to get an AI-powered breakdown of your Meta Ads with per-ad improvement suggestions.
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── Sticky bottom bar for Report Analysis ── */}
+      {tab === "report_analysis" && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
+          background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)",
+          borderTop: "1px solid var(--border)", padding: "14px 24px",
+          display: "flex", alignItems: "center", gap: 12
+        }}>
+          {/* Filter buttons */}
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {(["both", "live", "paused"] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setReportFilter(f)}
+                style={{
+                  padding: "7px 14px", borderRadius: 20, border: "1.5px solid",
+                  borderColor: reportFilter === f ? "var(--primary)" : "var(--border)",
+                  background: reportFilter === f ? "var(--primary)" : "#fff",
+                  color: reportFilter === f ? "#fff" : "var(--text-muted)",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize"
+                }}
+              >
+                {f === "both" ? "All Ads" : f === "live" ? "Live" : "Paused"}
+              </button>
+            ))}
+          </div>
+          {/* Text input */}
+          <input
+            type="text"
+            value={reportNote}
+            onChange={(e) => setReportNote(e.target.value)}
+            placeholder="Add a note or focus area (optional)..."
+            style={{
+              flex: 1, padding: "9px 16px", borderRadius: "var(--radius-md)",
+              border: "1.5px solid var(--border)", fontSize: 13, background: "#fff",
+              color: "var(--text)", outline: "none",
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !reportLoading) handleRunReport(); }}
+          />
+          {/* Analyse button */}
+          <button
+            onClick={handleRunReport}
+            disabled={reportLoading}
+            style={{
+              padding: "9px 24px", borderRadius: "var(--radius-md)", border: "none",
+              background: reportLoading ? "var(--border)" : "var(--primary)",
+              color: reportLoading ? "var(--text-muted)" : "#fff",
+              fontSize: 13, fontWeight: 700, cursor: reportLoading ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+              transition: "all 0.2s", boxShadow: reportLoading ? "none" : "0 4px 12px rgba(2,132,199,0.25)"
+            }}
+          >
+            {reportLoading ? <><Spinner size={14} color="var(--text-muted)" /> Analysing...</> : "Analyse"}
+          </button>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           SOCIAL-DASH — Creator Studio Section
