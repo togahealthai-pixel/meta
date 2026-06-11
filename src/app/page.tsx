@@ -1231,6 +1231,21 @@ export default function Dashboard() {
     }
   }, [tab, fetchLiveCampaigns, fetchMetaInsights]);
 
+  // Auto-refresh every 30s while any campaign/adset/ad is IN_PROCESS
+  useEffect(() => {
+    if (tab !== "live_campaigns") return;
+    const hasInProcess = liveCampaigns.some((c: any) =>
+      c.effective_status === "IN_PROCESS" ||
+      (c.adsets?.data || []).some((as: any) =>
+        as.effective_status === "IN_PROCESS" ||
+        (as.ads?.data || []).some((a: any) => a.effective_status === "IN_PROCESS")
+      )
+    );
+    if (!hasInProcess) return;
+    const timer = setInterval(fetchLiveCampaigns, 30000);
+    return () => clearInterval(timer);
+  }, [liveCampaigns, tab, fetchLiveCampaigns]);
+
   // ── Polling workflow status from Supabase status_table (id: 1) ──
   useEffect(() => {
     let interval;
@@ -5428,6 +5443,25 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* IN_PROCESS notice banner */}
+          {!liveLoading && liveCampaigns.some((c: any) =>
+            c.effective_status === "IN_PROCESS" ||
+            (c.adsets?.data || []).some((as: any) =>
+              as.effective_status === "IN_PROCESS" ||
+              (as.ads?.data || []).some((a: any) => a.effective_status === "IN_PROCESS")
+            )
+          ) && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", borderRadius: 12, background: "#f5f3ff", border: "1px solid #c4b5fd" }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>⏳</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#7c3aed" }}>Meta is reviewing your ads</div>
+                <div style={{ fontSize: 12, color: "#6d28d9", marginTop: 2, lineHeight: 1.5 }}>
+                  Items marked <b>Reviewing...</b> are going through Meta's automated policy check. This takes 2–30 minutes and happens automatically — you do not need to click Run. This page will refresh every 30 seconds until all ads are live.
+                </div>
+              </div>
+            </div>
+          )}
+
           {!liveLoading && liveCampaigns.length === 0 && !liveError && (
             <Card>
               <EmptyState title="No campaigns found" sub="Start a new campaign in the 'Campaign Setup' tab." />
@@ -5495,13 +5529,22 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 12, color: "var(--primary)", transition: "transform 0.2s", transform: expandedAdSets.has(adset.id) ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }}>▶</span>
                           <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{adset.name}</span>
-                          <Badge text={adset.effective_status} color={adset.effective_status === "ACTIVE" ? "var(--green)" : "var(--amber)"} bg={adset.effective_status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"} />
+                          <Badge
+                            text={adset.effective_status === "IN_PROCESS" ? "Reviewing..." : adset.effective_status}
+                            color={adset.effective_status === "ACTIVE" ? "var(--green)" : adset.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
+                            bg={adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
+                          />
                         </div>
+                        {adset.effective_status === "IN_PROCESS" && (
+                          <div style={{ paddingLeft: 20, fontSize: 11, color: "#7c3aed", display: "flex", alignItems: "center", gap: 5 }}>
+                            <span>⏳</span> Meta is reviewing this ad set — will go live automatically in a few minutes. No action needed.
+                          </div>
+                        )}
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 20 }} onClick={(e) => e.stopPropagation()}>
                           {[
                             { label: "Edit", color: "var(--primary)", fn: () => handleEditAdSet(campaign.id, adset.id), disabled: false },
-                            { label: "Run", color: "var(--green)", fn: () => handleUpdateStatus(adset.id, "AdSet", "ACTIVE", "run"), disabled: adset.effective_status === "ACTIVE" || updatingStatusId === adset.id },
-                            { label: "Pause", color: "var(--amber)", fn: () => handleUpdateStatus(adset.id, "AdSet", "PAUSED", "pause"), disabled: adset.effective_status === "PAUSED" || updatingStatusId === adset.id },
+                            { label: "Run", color: "var(--green)", fn: () => handleUpdateStatus(adset.id, "AdSet", "ACTIVE", "run"), disabled: adset.effective_status === "ACTIVE" || adset.effective_status === "IN_PROCESS" || updatingStatusId === adset.id },
+                            { label: "Pause", color: "var(--amber)", fn: () => handleUpdateStatus(adset.id, "AdSet", "PAUSED", "pause"), disabled: adset.effective_status === "PAUSED" || adset.effective_status === "IN_PROCESS" || updatingStatusId === adset.id },
                             { label: "Delete", color: "var(--red-strong)", fn: () => handleUpdateStatus(adset.id, "AdSet", null, "delete"), disabled: updatingStatusId === adset.id },
                           ].map(btn => (
                             <button key={btn.label} onClick={(e) => { e.stopPropagation(); btn.fn(); }} disabled={btn.disabled}
@@ -5529,7 +5572,11 @@ export default function Dashboard() {
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                                       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ad.name}</div>
-                                      <Badge text={ad.effective_status} color={ad.effective_status === "ACTIVE" ? "var(--green)" : "var(--amber)"} bg={ad.effective_status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"} />
+                                      <Badge
+                                        text={ad.effective_status === "IN_PROCESS" ? "Reviewing..." : ad.effective_status}
+                                        color={ad.effective_status === "ACTIVE" ? "var(--green)" : ad.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
+                                        bg={ad.effective_status === "ACTIVE" ? "var(--green-light)" : ad.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
+                                      />
                                     </div>
                                     <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>ID: {ad.id}</div>
                                   </div>
@@ -5550,10 +5597,15 @@ export default function Dashboard() {
                                 </div>
 
                                 {/* Controls */}
+                                {ad.effective_status === "IN_PROCESS" && (
+                                  <div style={{ fontSize: 11, color: "#7c3aed", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                                    <span>⏳</span> Under Meta review — will go live automatically. No action needed.
+                                  </div>
+                                )}
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                   {[
-                                    { label: "Run", color: "var(--green)", disabled: ad.effective_status === "ACTIVE" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "ACTIVE", "run") },
-                                    { label: "Pause", color: "var(--amber)", disabled: ad.effective_status === "PAUSED" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "PAUSED", "pause") },
+                                    { label: "Run", color: "var(--green)", disabled: ad.effective_status === "ACTIVE" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "ACTIVE", "run") },
+                                    { label: "Pause", color: "var(--amber)", disabled: ad.effective_status === "PAUSED" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "PAUSED", "pause") },
                                     { label: "Delete", color: "var(--red-strong)", disabled: updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", null, "delete") },
                                   ].map(btn => (
                                     <button key={btn.label} onClick={btn.fn} disabled={btn.disabled}
