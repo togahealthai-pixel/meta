@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       for (const adset of adsets) {
         const ads = (adset.ads as { data?: Record<string, unknown>[] } | undefined)?.data || [];
         for (const ad of ads) {
-          rawAds.push({ ...(ad as RawAd), campaign_name: campaign.name as string });
+          rawAds.push({ ...(ad as unknown as RawAd), campaign_name: campaign.name as string });
         }
       }
     }
