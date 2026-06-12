@@ -6403,8 +6403,8 @@ export default function Dashboard() {
               {/* ── Underperformers + Suggestions ── */}
               {(reportResult.underperformers || []).length > 0 && (
                 <Card style={{ padding: '20px 24px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#dc2626' }}>⚠ Needs Improvement — Specific Changes to Make</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Per-ad viral rewrites, targeting fixes, and budget actions</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#dc2626' }}>⚠ Needs Improvement — Targeted Changes Only</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Only the changes that will actually move results for each specific ad — based on its problem pattern</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {(reportResult.underperformers as any[]).map((ad: any) => {
                       const sugg = (reportResult.underperformer_suggestions || []).find((s: any) => s.ad_id === ad.id);
@@ -6438,7 +6438,7 @@ export default function Dashboard() {
                                 { label: 'Best CTA', val: sugg.cta_suggestion, color: '#7c3aed', bg: '#f5f3ff' },
                                 { label: 'Targeting Change', val: sugg.targeting_suggestion, color: '#0891b2', bg: '#ecfeff' },
                                 { label: 'Budget Action', val: sugg.budget_suggestion, color: '#d97706', bg: '#fffbeb' },
-                              ] as { label: string; val: string; color: string; bg: string }[]).filter(f => f.val).map(f => (
+                              ] as { label: string; val: string | null; color: string; bg: string }[]).filter(f => f.val).map(f => (
                                 <div key={f.label} style={{ background: f.bg, border: `1px solid ${f.color}25`, borderRadius: 10, padding: '10px 14px' }}>
                                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: f.color, marginBottom: 4 }}>{f.label}</div>
                                   <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{f.val}</div>
