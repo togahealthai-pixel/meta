@@ -183,22 +183,31 @@ export async function GET(req: NextRequest) {
     const insightMap = new Map(insightsRaw.map((i) => [i.ad_id as string, i]));
 
     // ── Filter ──
+    // "live"   = only ACTIVE ads
+    // "paused" = PAUSED + CAMPAIGN_PAUSED + ADSET_PAUSED (all variants of not running)
+    // "both"   = everything
     const filtered = adsRaw.filter((ad) => {
       const s = ((ad.effective_status || ad.status || "") as string).toUpperCase();
       if (filter === "live") return s === "ACTIVE";
-      if (filter === "paused") return s === "PAUSED";
+      if (filter === "paused") return ["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(s);
       return ["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(s);
     });
 
-    if (!filtered.length && adsRaw.length === 0) {
+    // Always respect the filter — never fall back to all ads when a specific filter is set
+    if (filtered.length === 0) {
+      const emptyMsg = filter === "live"
+        ? "No active ads found. Your ads may all be paused."
+        : filter === "paused"
+        ? "No paused ads found. Your ads may all be active."
+        : "No ads found. Make sure your access token has ads_read permission.";
       return NextResponse.json({
         summary: { total_ads: 0, total_spend: 0, total_impressions: 0, total_clicks: 0, avg_ctr: 0, avg_cpm: 0, avg_cpc: 0 },
         top_performers: [], underperformers: [], all_ads: [],
-        ai_overview: "No ads found. Make sure your access token has ads_read permission.",
+        ai_overview: emptyMsg,
         key_insights: [], top_performer_notes: [], underperformer_suggestions: [], overall_recommendation: "",
       });
     }
-    const adsToAnalyse = filtered.length > 0 ? filtered : adsRaw;
+    const adsToAnalyse = filtered;
 
     // ── Supabase creative data ──
     interface SbRow {
@@ -418,28 +427,54 @@ ${JSON.stringify(rawForGpt, null, 2)}
 ---
 ## SCORING RULES (apply the Meta fundamentals above)
 
-Score 0–100 based on ACTUAL metrics only:
+Scoring is RELATIVE — compare ads to each other, not to external benchmarks:
 - spend=0 AND impressions=0 → score 5 max, MUST be "underperformer"
-- spend>0, impressions>0, clicks=0, CTR=0% → score 8–25 max, likely "underperformer"
-- CTR 0.01–0.29% → score 26–50
-- CTR 0.3–0.69% → score 51–75
-- CTR ≥ 0.7% → score 76–100
-- Adjust ±10 for CPM and CPC efficiency relative to account average
-- "top_performer" requires: score ≥ 40 AND (clicks > 0 OR CTR > 0.2%) AND impressions > 0
+- spend>0, impressions>0, clicks=0, CTR=0% → score 8–25 max, "underperformer"
+- CTR > 0 and highest in this account → score ≥ 50, regardless of absolute value
+- Adjust ±10 for CPM and CPC efficiency relative to THIS account's average
+
+CRITICAL — top_performer classification:
+- The ad with the highest CTR AND actual clicks in the account is ALWAYS "top_performer",
+  even if its absolute CTR is low by industry standards
+- An ad with 0 clicks and 0 impressions can NEVER be "top_performer"
+- If ALL ads have 0 clicks, classify only the single ad with most impressions as "top_performer"
+- You MUST classify at least 1 ad as "top_performer" (the best relative to others)
 
 ---
 ## SUGGESTION RULES (critical — read carefully)
 
-For each underperformer, identify the PRIMARY PROBLEM using the diagnostic patterns in the fundamentals section above.
-Then return ONLY the suggestions that are directly relevant to that problem:
+For each underperformer, identify the PRIMARY PROBLEM pattern and return ONLY the fields that fix that problem.
+Leave all other fields as null.
 
-- PATTERN A (never served): return ONLY targeting_suggestion + budget_suggestion. Set headline_suggestion and body_suggestion and cta_suggestion to null.
-- PATTERN B (0 clicks despite spend): return headline_suggestion + body_suggestion + budget_suggestion. Set targeting_suggestion and cta_suggestion to null UNLESS cta is clearly wrong.
-- PATTERN C (low CTR, high CPC): return headline_suggestion + targeting_suggestion + cta_suggestion. Set body_suggestion to null unless body is clearly the issue.
-- PATTERN D (good CTR but low impressions): return budget_suggestion + targeting_suggestion ONLY. Do not suggest copy changes.
-- PATTERN E (good CTR, high CPC): return cta_suggestion + targeting_suggestion ONLY.
+- PATTERN A (spend=0, impressions=0 — never served):
+  → Return ONLY: issue + targeting_suggestion + budget_suggestion
+  → Set headline_suggestion, body_suggestion, cta_suggestion to null
+  → REASON: The ad hasn't run. Copy changes are meaningless until delivery is fixed.
 
-Suggestions must be SPECIFIC and ACTIONABLE — reference the actual ad name, current headline/body text, and give concrete rewrites. Do not give generic advice.
+- PATTERN B (impressions>0, spend>0, clicks=0, CTR=0% — hook failing):
+  → Return ONLY: issue + headline_suggestion + body_suggestion + budget_suggestion
+  → Set targeting_suggestion, cta_suggestion to null (unless CTA is clearly BOOK_NOW on cold audience)
+  → IMPORTANT: If headline/body data is null (not retrieved), write structural guidance using [brackets]
+    e.g. "[Open with a specific number: '5 patients saved $X on [procedure] — here is how']"
+    Do NOT invent specific medical procedures, prices, or claims you do not know from the ad data.
+
+- PATTERN C (clicks>0 but CTR < account avg, high CPC):
+  → Return ONLY: issue + targeting_suggestion + cta_suggestion
+  → Set headline_suggestion, body_suggestion to null
+
+- PATTERN D (CTR > 0 but very low impressions — delivery limited):
+  → Return ONLY: issue + budget_suggestion + targeting_suggestion
+
+- PATTERN E (decent CTR, high CPC relative to account):
+  → Return ONLY: issue + cta_suggestion + targeting_suggestion
+
+ABSOLUTE PROHIBITION — never invent:
+- Specific medical procedures (rhinoplasty, hair transplant, belly fat, etc.) unless they appear in the ad name/headline/body data
+- Specific prices or savings amounts ("save 70%", "$8,000") unless they appear in the ad data
+- Specific country names or clinic names unless present in the ad data
+- Any claim about the product/service not supported by the ad data provided
+
+When creative data is null, provide structural templates in [brackets] so the user can fill in their real content.
 
 ---
 ## REQUIRED JSON OUTPUT (return ONLY valid JSON, no markdown)
@@ -448,17 +483,17 @@ Suggestions must be SPECIFIC and ACTIONABLE — reference the actual ad name, cu
   "scored_ads": [
     { "ad_id": "<id>", "score": <0-100>, "classification": "top_performer" | "underperformer", "pattern": "A|B|C|D|E|top" }
   ],
-  "ai_overview": "2-3 sentences: account health, single biggest CTR lever, what is holding performance back",
+  "ai_overview": "2-3 sentences: account health based on actual numbers, single biggest opportunity using real metrics, what is holding performance back",
   "key_insights": [
-    "Specific insight referencing ad names and real metric numbers",
-    "Why the top ad works (or why all are struggling) — reference its actual hook/copy",
-    "The one pattern across all underperforming ads that, if fixed, would lift the whole account"
+    "Insight with the actual ad name and the exact metric numbers from the data",
+    "Why the top ad is outperforming others — based on its actual metrics, not invented copy",
+    "The one shared problem across all underperforming ads"
   ],
   "top_performer_notes": [
     {
       "ad_id": "<id>",
       "ad_name": "<name>",
-      "why_performing": "Specific reason — name the psychological trigger, reference the actual headline/hook, explain the metric outcome"
+      "why_performing": "Reference its actual metrics (CTR, clicks, CPM). If headline is available reference it. Do not invent content."
     }
   ],
   "underperformer_suggestions": [
@@ -466,23 +501,23 @@ Suggestions must be SPECIFIC and ACTIONABLE — reference the actual ad name, cu
       "ad_id": "<id>",
       "ad_name": "<name>",
       "pattern": "A|B|C|D|E",
-      "issue": "The single root cause — be specific, reference metrics and ad name",
-      "headline_suggestion": "<rewritten headline OR null>",
-      "body_suggestion": "<rewritten body copy OR null>",
-      "cta_suggestion": "<best CTA button OR null>",
-      "targeting_suggestion": "<specific audience change OR null>",
+      "issue": "Root cause — specific to this ad's actual metrics (spend $X, impressions Y, clicks Z)",
+      "headline_suggestion": "<structural template in [brackets] if no headline data, OR null if pattern doesn't need it>",
+      "body_suggestion": "<structural template in [brackets] if no body data, OR null if pattern doesn't need it>",
+      "cta_suggestion": "<specific CTA button name OR null>",
+      "targeting_suggestion": "<specific audience action OR null>",
       "budget_suggestion": "<concrete $ action OR null>"
     }
   ],
-  "overall_recommendation": "The #1 highest-ROI action right now — name the specific ad, exact $ move, expected CTR outcome"
+  "overall_recommendation": "The single highest-ROI action — name the specific ad, exact budget move, based on real data"
 }
 
 HARD RULES:
 1. scored_ads MUST have exactly ${ads.length} entries — one per ad, no duplicates, no omissions
 2. underperformer_suggestions MUST have one entry for EVERY ad_id classified as "underperformer"
 3. top_performer_notes MUST have one entry for EVERY ad_id classified as "top_performer"
-4. null fields are fine — only fill a suggestion field if it will genuinely help for that ad's pattern
-5. Do NOT suggest headline/body rewrites for an ad that has never served (Pattern A) — fix delivery first`;
+4. Every insight and suggestion must be grounded in the actual metric numbers provided — no invented data
+5. null fields are correct — only populate a field if it directly addresses that pattern's root cause`;
 
     // ── Validation Prompt ──
     function buildValidationPrompt(analysis: Record<string, unknown>): string {
@@ -511,8 +546,10 @@ ${classified.length !== ads.length ? `1. scored_ads has ${classified.length} ent
 ${missingSugg.length > 0 ? `2. underperformer_suggestions is MISSING entries for these ad_ids: ${missingSugg.join(", ")}. Add them now using the pattern rules.` : "2. underperformer_suggestions complete."}
 ${missingTop.length > 0 ? `3. top_performer_notes is MISSING entries for these ad_ids: ${missingTop.join(", ")}. Add them.` : "3. top_performer_notes complete."}
 4. Verify: any ad with spend=0 AND impressions=0 must be "underperformer". Fix if wrong.
-5. Verify: suggestion fields for Pattern A ads must be null for headline/body/cta. Fix if wrong.
-6. Verify: all non-null suggestion fields have actual content (not empty strings). Fill if blank.
+5. Verify: Pattern A ads (never served) must have null for headline_suggestion, body_suggestion, cta_suggestion. Fix if wrong.
+6. Verify: the ad with the highest CTR and actual clicks is classified "top_performer". Fix if it is incorrectly classified as underperformer.
+7. Verify: no suggestion text mentions a specific medical procedure, price, country, or clinic name that is NOT present in the original ad data. If found, replace with a structural template in [brackets].
+8. Verify: all non-null suggestion fields have actual content (not empty strings). Fill if blank using the pattern rules.
 
 Return the COMPLETE corrected JSON in the exact same structure. Do not remove any data that is already correct.`;
     }
