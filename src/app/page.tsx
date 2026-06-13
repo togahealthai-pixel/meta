@@ -120,7 +120,7 @@ function generateReportHTML(result: any, filter: string, note: string): string {
       <div style="flex:1;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <span style="font-weight:700;font-size:14px;color:#0f172a;">${ad.name}</span>
-          <span style="background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
+          <span style="background:${ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626'};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
         </div>
         <div style="font-size:12px;color:#475569;margin-bottom:6px;">CTR: <b>${ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>$${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>${ad.clicks}</b> &nbsp;|&nbsp; CPM: <b>${ad.cpm > 0 ? "$" + ad.cpm.toFixed(2) : "—"}</b></div>
         ${note_obj?.why_performing ? `<div style="font-size:12px;color:#16a34a;font-style:italic;">✓ ${note_obj.why_performing}</div>` : ""}
@@ -150,7 +150,7 @@ function generateReportHTML(result: any, filter: string, note: string): string {
         <div style="flex:1;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <span style="font-weight:700;font-size:14px;color:#0f172a;">${ad.name}</span>
-            <span style="background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
+            <span style="background:${ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626'};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">Score: ${ad.score}</span>
           </div>
           <div style="font-size:12px;color:#475569;">CTR: <b>${ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>$${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>${ad.clicks}</b></div>
         </div>
@@ -162,7 +162,7 @@ function generateReportHTML(result: any, filter: string, note: string): string {
   const allAdsRows = (result.all_ads || []).map((ad: any, i: number) => {
     const bg = i % 2 === 0 ? "#fff" : "#f8fafc";
     const statusColor = ad.status === "ACTIVE" ? "#16a34a" : ad.status === "PAUSED" ? "#d97706" : "#64748b";
-    const scoreColor = ad.score >= 60 ? "#16a34a" : ad.score >= 25 ? "#d97706" : "#dc2626";
+    const scoreColor = ad.score >= 70 ? "#16a34a" : ad.score >= 40 ? "#d97706" : "#dc2626";
     return `<tr style="background:${bg};">
       <td style="padding:10px 14px;font-weight:600;font-size:13px;">${ad.name}</td>
       <td style="padding:10px 14px;font-size:12px;color:#64748b;">${ad.campaign_name}</td>
@@ -6384,7 +6384,7 @@ export default function Dashboard() {
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                               <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
-                              <span style={{ background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                              <span style={{ background: ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
                               CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; CPM: <b>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : '—'}</b>
@@ -6420,7 +6420,7 @@ export default function Dashboard() {
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, flexWrap: 'wrap', gap: 6 }}>
                                 <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
-                                <span style={{ background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                                <span style={{ background: ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                                 CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; Status: <b>{ad.status}</b>
@@ -6470,7 +6470,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody>
                         {(reportResult.all_ads as any[]).map((ad: any, i: number) => {
-                          const scoreColor = ad.score >= 60 ? '#16a34a' : ad.score >= 25 ? '#d97706' : '#dc2626';
+                          const scoreColor = ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626';
                           const statusColor = ad.status === 'ACTIVE' ? '#16a34a' : '#64748b';
                           return (
                             <tr key={ad.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
