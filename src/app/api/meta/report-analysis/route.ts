@@ -31,11 +31,7 @@ async function allPages(path: string, params: Record<string, string> = {}) {
   return items;
 }
 
-async function callOpenAI(
-  prompt: string,
-  maxTokens: number,
-  label: string
-): Promise<Record<string, unknown>> {
+async function callOpenAI(prompt: string, maxTokens: number, label: string): Promise<Record<string, unknown>> {
   const errors: string[] = [];
   for (const model of ["gpt-4o", "gpt-4-turbo"]) {
     try {
@@ -65,86 +61,93 @@ async function callOpenAI(
   throw new Error(errors.join(" | "));
 }
 
+// ── Absolute, deterministic score — same ad always gets same score regardless of filter ──
+// Based only on the ad's own metrics, no comparison to other ads.
+function computeScore(spend: number, impressions: number, clicks: number, ctr: number, cpm: number): number {
+  // Never served
+  if (impressions === 0 && spend === 0) return 5;
+  // Served but zero engagement
+  if (clicks === 0) return impressions > 200 ? 12 : 8;
+
+  // CTR-based base score (absolute thresholds)
+  let ctrScore: number;
+  if (ctr < 0.1)       ctrScore = 15 + (ctr / 0.1) * 10;                        // 15–25
+  else if (ctr < 0.3)  ctrScore = 25 + ((ctr - 0.1) / 0.2) * 20;               // 25–45
+  else if (ctr < 0.7)  ctrScore = 45 + ((ctr - 0.3) / 0.4) * 20;               // 45–65
+  else if (ctr < 1.5)  ctrScore = 65 + ((ctr - 0.7) / 0.8) * 15;               // 65–80
+  else                  ctrScore = 80 + Math.min(((ctr - 1.5) / 1.5) * 15, 15); // 80–95
+
+  // Click volume bonus: up to +10
+  const clickBonus = Math.min(clicks * 0.5, 10);
+
+  // CPM efficiency bonus: ±5
+  const cpmBonus = cpm > 0 && cpm < 2 ? 5 : cpm >= 2 && cpm < 5 ? 3 : cpm > 12 ? -3 : 0;
+
+  return Math.max(5, Math.min(100, Math.round(ctrScore + clickBonus + cpmBonus)));
+}
+
 // ─────────────────────────────────────────────
-// Deep Meta Ads context injected into every GPT call
+// Deep Meta Ads context for GPT text analysis
 // ─────────────────────────────────────────────
 const META_ADS_CONTEXT = `
-## META ADS FUNDAMENTALS YOU MUST APPLY
+## META ADS FUNDAMENTALS
 
 ### The Auction
-Facebook runs a real-time auction for every impression. Your ad wins based on:
-  Total Value = (Bid) × (Estimated Action Rate) × (Ad Quality Score)
+Facebook runs a real-time auction for every impression:
+  Total Value = Bid × Estimated Action Rate × Ad Quality
 Higher CTR → higher estimated action rate → wins more auctions → lower effective CPM.
-A 2× CTR improvement often halves your CPM — that is why CTR is the #1 lever.
-
-### Quality Ranking (Relevance Diagnostics)
-Meta scores each ad against others targeting the same audience:
-  - Quality Ranking: perceived quality vs competing ads
-  - Engagement Rate Ranking: expected engagement vs similar ads
-  - Conversion Rate Ranking: expected conversion rate
-Below average on any of these = ad shown less, CPM rises. Fix: refresh creative or tighten audience.
+A 2× CTR improvement often halves CPM — CTR is the #1 lever.
 
 ### CTR Benchmarks (Healthcare / Medical Tourism)
-  - < 0.3% CTR  → poor. Hook is not stopping the scroll. Rewrite first line / first frame.
-  - 0.3–0.7% CTR → average. Room to improve copy and audience targeting.
-  - 0.7–1.5% CTR → good. Scale budget carefully, monitor frequency.
-  - > 1.5% CTR  → excellent. Double budget, build lookalikes from clickers.
+  < 0.1%  CTR → poor. Hook is not stopping the scroll.
+  0.1–0.3% CTR → below average. Hook needs improvement.
+  0.3–0.7% CTR → average. Optimise copy and audience.
+  0.7–1.5% CTR → good. Scale carefully, watch frequency.
+  > 1.5%  CTR → excellent. Double budget, build lookalikes.
 
 ### CPM Benchmarks (Healthcare)
-  - < $3 CPM  → great delivery, broad/cheap audience. May need more qualified targeting.
-  - $3–8 CPM  → healthy range.
-  - > $12 CPM → audience too narrow or low quality ranking. Widen targeting or refresh creative.
-
-### The Learning Phase
-New ads need ~50 optimization events in 7 days. During learning:
-  - Performance fluctuates — do NOT judge before 500 impressions minimum
-  - Avoid editing the ad or budget (resets learning)
-  - If learning is stuck: increase budget or broaden audience
+  < $3 CPM  → efficient delivery. May need more qualified targeting.
+  $3–8 CPM  → healthy range.
+  > $12 CPM → audience too narrow or low quality ranking.
 
 ### Diagnosing by Metric Pattern
   PATTERN A — spend=0, impressions=0:
     Root cause: campaign/ad set is paused OR budget is $0 OR ad is disapproved.
-    Fix: check campaign status and budget first. Do NOT suggest copy rewrites — the ad hasn't run.
+    Fix: check campaign status and budget FIRST. Copy rewrites are meaningless until the ad runs.
 
   PATTERN B — impressions>0, spend>0, clicks=0, CTR=0%:
     Root cause: creative hook is failing in first 3 seconds (video) or thumb-stop (image).
-    Fix: rewrite the hook / headline. The audience IS seeing the ad but scrolling past.
+    Fix: rewrite the headline/hook. The audience IS seeing the ad but scrolling past.
 
-  PATTERN C — CTR 0.01–0.3%, clicks>0 but CPC very high:
-    Root cause: wrong audience (low relevance) or weak body copy (interest but no action).
-    Fix: tighten audience targeting + strengthen the CTA / body copy.
+  PATTERN C — clicks>0 but CTR below average, high CPC:
+    Root cause: wrong audience (low relevance) or weak body copy.
+    Fix: tighten targeting + strengthen CTA / body.
 
-  PATTERN D — CTR>0.3% but low total clicks (low impressions):
-    Root cause: budget is too low or audience is too narrow — ad is starved of delivery.
-    Fix: increase daily budget or broaden audience (not a creative problem).
+  PATTERN D — decent CTR but low total impressions:
+    Root cause: budget too low or audience too narrow — delivery is starved.
+    Fix: increase budget or broaden audience. NOT a creative problem.
 
-  PATTERN E — good CTR but high CPC (>$2 for healthcare):
-    Root cause: landing page or CTA mismatch, or audience not ready to click through.
-    Fix: align CTA with audience intent, test a softer ask (LEARN_MORE vs BOOK_TRAVEL).
+  PATTERN E — decent CTR, high CPC relative to account:
+    Root cause: CTA mismatch or audience not ready for direct conversion.
+    Fix: soften the ask (LEARN_MORE vs BOOK_TRAVEL) or tighten lookalike.
 
-### What Actually Moves Results (in priority order)
-  1. Hook / First Line — 80% of CTR is determined by the first sentence or first 3 seconds
-  2. Audience Match — wrong audience = no clicks regardless of creative quality
-  3. Budget — ads need minimum $5–10/day to exit learning phase and get real data
+### What Moves Results (priority order)
+  1. Hook / First Line — 80% of CTR is the first sentence or first 3 seconds
+  2. Audience Match — wrong audience = no clicks regardless of creative
+  3. Budget — minimum $5–10/day to exit learning phase
   4. CTA Alignment — mismatch between ad promise and button creates friction
-  5. Creative Format — video outperforms image for awareness; image can win for direct response
-  6. Bid Strategy — only matters after CTR and audience are optimised
+  5. Bid Strategy — only matters after CTR and audience are optimised
 
-### CTA Selection Guide
-  - LEARN_MORE → lowest friction, best for cold audiences who don't know your brand
-  - GET_QUOTE → works for high-consideration services (medical, insurance)
-  - BOOK_TRAVEL → strong for medical tourism / travel verticals
-  - CONTACT_US → good for local or premium services where relationship matters
-  - SIGN_UP → only use when there is a clear form or lead magnet
-  - SHOP_NOW → e-commerce only
+### Hook Writing (use when suggesting rewrites)
+  Scroll-stopping hooks use: specific number | bold question | surprising stat | direct pain
+  Examples: "5 Canadians cut surgery cost by 70% doing this" | "Are you paying 3× too much?"
+  Avoid: "We offer..." / "Our clinic provides..." — lose 90% of viewers immediately.
 
-### Hook Writing Principles
-  Scroll-stopping hooks use one of:
-  - Specific number: "5 Canadians cut their surgery cost by 70% doing this"
-  - Bold question: "Are you paying 3× too much for dental work abroad?"
-  - Surprising stat: "The #1 reason medical tourists choose [Country] isn't price"
-  - Direct pain: "Tired of waiting 6 months for a specialist? There's another way."
-  Avoid generic openers like "We offer..." or "Our clinic provides..." — these lose 90% of viewers.
+### Anti-Hallucination Rule
+  NEVER invent: specific procedures, prices, countries, clinic names, or statistics
+  unless they appear in the ad's headline/body/story data.
+  When data is null → use structural templates in [square brackets]:
+  e.g. "[Open with: 'X patients saved [amount] on [procedure] — here's how']"
 `;
 
 export async function GET(req: NextRequest) {
@@ -158,7 +161,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Missing Meta credentials" }, { status: 500 });
     }
 
-    // ── Fetch ads ──
+    // ── Fetch ALL ads (no filter at this stage) ──
     const adsRaw = await allPages(`act_${ACCOUNT}/ads`, {
       fields: "id,name,status,effective_status,campaign_id,adset_id,creative{id,title,body,call_to_action_type,image_url,thumbnail_url,video_id}",
       limit: "200",
@@ -182,33 +185,6 @@ export async function GET(req: NextRequest) {
     } catch { /* no spend in period */ }
     const insightMap = new Map(insightsRaw.map((i) => [i.ad_id as string, i]));
 
-    // ── Filter ──
-    // "live"   = only ACTIVE ads
-    // "paused" = PAUSED + CAMPAIGN_PAUSED + ADSET_PAUSED (all variants of not running)
-    // "both"   = everything
-    const filtered = adsRaw.filter((ad) => {
-      const s = ((ad.effective_status || ad.status || "") as string).toUpperCase();
-      if (filter === "live") return s === "ACTIVE";
-      if (filter === "paused") return ["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(s);
-      return ["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(s);
-    });
-
-    // Always respect the filter — never fall back to all ads when a specific filter is set
-    if (filtered.length === 0) {
-      const emptyMsg = filter === "live"
-        ? "No active ads found. Your ads may all be paused."
-        : filter === "paused"
-        ? "No paused ads found. Your ads may all be active."
-        : "No ads found. Make sure your access token has ads_read permission.";
-      return NextResponse.json({
-        summary: { total_ads: 0, total_spend: 0, total_impressions: 0, total_clicks: 0, avg_ctr: 0, avg_cpm: 0, avg_cpc: 0 },
-        top_performers: [], underperformers: [], all_ads: [],
-        ai_overview: emptyMsg,
-        key_insights: [], top_performer_notes: [], underperformer_suggestions: [], overall_recommendation: "",
-      });
-    }
-    const adsToAnalyse = filtered;
-
     // ── Supabase creative data ──
     interface SbRow {
       id: string; text: string; story?: string | null; Story?: string | null;
@@ -230,59 +206,107 @@ export async function GET(req: NextRequest) {
       } catch { /**/ }
     }
 
-    // ── Normalise ──
+    // ── Normalise and score ALL ads upfront ──
+    // Filter to recognised statuses, then score every ad with the absolute formula.
+    // The filter param is applied AFTER scoring so scores never change between views.
     interface Ad {
       id: string; name: string; status: string; campaign_name: string; campaign_id: string;
       headline: string; body: string; cta: string; image_url: string; media_url: string;
       story: string; spend: number; impressions: number; clicks: number; ctr: number;
-      cpc: number; cpm: number; reach: number; frequency: number; score?: number;
+      cpc: number; cpm: number; reach: number; frequency: number; score: number;
     }
 
-    const ads: Ad[] = adsToAnalyse.map((ad) => {
-      const ins = insightMap.get(ad.id as string) || {};
-      const creative = (ad.creative as Record<string, unknown>) || {};
-      const sbRow = sbByName.get((ad.name as string).toLowerCase().trim());
-      let sbJson: Record<string, unknown> = {};
-      if (sbRow) {
-        try { sbJson = typeof sbRow["json data"] === "string" ? JSON.parse(sbRow["json data"]) : (sbRow["json data"] as Record<string, unknown>) || {}; } catch { /**/ }
-      }
-      const sbAd = (sbJson?.ad || (sbJson?.ads as unknown[])?.[0] || {}) as Record<string, unknown>;
-      return {
-        id: ad.id as string, name: ad.name as string,
-        status: ((ad.effective_status || ad.status || "") as string).toUpperCase(),
-        campaign_name: campMap.get(ad.campaign_id as string) || (ad.campaign_id as string) || "",
-        campaign_id: ad.campaign_id as string,
-        headline: (sbAd.headline as string) || (creative.title as string) || "",
-        body: (sbAd.primary_text as string) || (creative.body as string) || "",
-        cta: (sbAd.call_to_action_type as string) || (creative.call_to_action_type as string) || "",
-        image_url: (creative.image_url as string) || (creative.thumbnail_url as string) || "",
-        media_url: sbRow?.text || (creative.thumbnail_url as string) || (creative.image_url as string) || "",
-        story: (sbRow?.story || sbRow?.Story || sbRow?.["Story"] || "") as string,
-        spend: parseFloat((ins.spend as string) || "0"),
-        impressions: parseInt((ins.impressions as string) || "0", 10),
-        clicks: parseInt((ins.inline_link_clicks as string) || "0", 10),
-        ctr: parseFloat((ins.inline_link_click_ctr as string) || "0"),
-        cpc: parseFloat((ins.cost_per_inline_link_click as string) || (ins.cpc as string) || "0"),
-        cpm: parseFloat((ins.cpm as string) || "0"),
-        reach: parseInt((ins.reach as string) || "0", 10),
-        frequency: parseFloat((ins.frequency as string) || "0"),
-      };
+    const VALID_STATUSES = ["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"];
+
+    const allNormalized: Ad[] = adsRaw
+      .filter((ad) => VALID_STATUSES.includes(((ad.effective_status || ad.status || "") as string).toUpperCase()))
+      .map((ad) => {
+        const ins = insightMap.get(ad.id as string) || {};
+        const creative = (ad.creative as Record<string, unknown>) || {};
+        const sbRow = sbByName.get((ad.name as string).toLowerCase().trim());
+        let sbJson: Record<string, unknown> = {};
+        if (sbRow) {
+          try { sbJson = typeof sbRow["json data"] === "string" ? JSON.parse(sbRow["json data"]) : (sbRow["json data"] as Record<string, unknown>) || {}; } catch { /**/ }
+        }
+        const sbAd = (sbJson?.ad || (sbJson?.ads as unknown[])?.[0] || {}) as Record<string, unknown>;
+
+        const spend      = parseFloat((ins.spend as string) || "0");
+        const impressions = parseInt((ins.impressions as string) || "0", 10);
+        const clicks     = parseInt((ins.inline_link_clicks as string) || "0", 10);
+        const ctr        = parseFloat((ins.inline_link_click_ctr as string) || "0");
+        const cpm        = parseFloat((ins.cpm as string) || "0");
+        const cpc        = parseFloat((ins.cost_per_inline_link_click as string) || (ins.cpc as string) || "0");
+
+        return {
+          id: ad.id as string,
+          name: ad.name as string,
+          status: ((ad.effective_status || ad.status || "") as string).toUpperCase(),
+          campaign_name: campMap.get(ad.campaign_id as string) || (ad.campaign_id as string) || "",
+          campaign_id: ad.campaign_id as string,
+          headline: (sbAd.headline as string) || (creative.title as string) || "",
+          body: (sbAd.primary_text as string) || (creative.body as string) || "",
+          cta: (sbAd.call_to_action_type as string) || (creative.call_to_action_type as string) || "",
+          image_url: (creative.image_url as string) || (creative.thumbnail_url as string) || "",
+          media_url: sbRow?.text || (creative.thumbnail_url as string) || (creative.image_url as string) || "",
+          story: (sbRow?.story || sbRow?.Story || sbRow?.["Story"] || "") as string,
+          spend, impressions, clicks, ctr, cpc, cpm,
+          reach: parseInt((ins.reach as string) || "0", 10),
+          frequency: parseFloat((ins.frequency as string) || "0"),
+          score: computeScore(spend, impressions, clicks, ctr, cpm),
+        };
+      });
+
+    // ── Apply filter for display only (scores already locked in) ──
+    const adsToDisplay = allNormalized.filter((ad) => {
+      if (filter === "live")   return ad.status === "ACTIVE";
+      if (filter === "paused") return ["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(ad.status);
+      return true;
     });
 
-    // ── Summary ──
-    const totalSpend = ads.reduce((s, a) => s + a.spend, 0);
-    const totalImpressions = ads.reduce((s, a) => s + a.impressions, 0);
-    const totalClicks = ads.reduce((s, a) => s + a.clicks, 0);
-    const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    const cpmAds = ads.filter((a) => a.cpm > 0);
-    const avgCpm = cpmAds.length > 0 ? cpmAds.reduce((s, a) => s + a.cpm, 0) / cpmAds.length : 0;
-    const cpcAds = ads.filter((a) => a.cpc > 0);
-    const avgCpc = cpcAds.length > 0 ? cpcAds.reduce((s, a) => s + a.cpc, 0) / cpcAds.length : 0;
+    if (adsToDisplay.length === 0) {
+      const msg = filter === "live"
+        ? "No active ads found. All ads may be paused."
+        : filter === "paused"
+        ? "No paused ads found. All ads may be active."
+        : "No ads found. Make sure your access token has ads_read permission.";
+      return NextResponse.json({
+        summary: { total_ads: 0, total_spend: 0, total_impressions: 0, total_clicks: 0, avg_ctr: 0, avg_cpm: 0, avg_cpc: 0 },
+        top_performers: [], underperformers: [], all_ads: [],
+        ai_overview: msg, key_insights: [], top_performer_notes: [], underperformer_suggestions: [], overall_recommendation: "",
+      });
+    }
 
-    // ── Build raw data for GPT (no code-side scoring) ──
-    const rawForGpt = ads.map((a) => ({
+    // ── Sort by score (descending) ──
+    const sorted = [...adsToDisplay].sort((a, b) => b.score - a.score);
+
+    // ── Classify top / under IN CODE (not GPT) ──
+    // Top performers: score >= 40, up to 3 ads
+    // If no ad qualifies, take the single best-scored ad with actual impressions
+    const qualifiedTop = sorted.filter((a) => a.score >= 40).slice(0, 3);
+    const topPerformers = qualifiedTop.length > 0
+      ? qualifiedTop
+      : sorted.filter((a) => a.impressions > 0).slice(0, 1).length > 0
+        ? sorted.filter((a) => a.impressions > 0).slice(0, 1)
+        : sorted.slice(0, 1);
+    const topIds = new Set(topPerformers.map((a) => a.id));
+    const underperformers = sorted.filter((a) => !topIds.has(a.id));
+
+    // ── Summary ──
+    const totalSpend      = adsToDisplay.reduce((s, a) => s + a.spend, 0);
+    const totalImpressions = adsToDisplay.reduce((s, a) => s + a.impressions, 0);
+    const totalClicks     = adsToDisplay.reduce((s, a) => s + a.clicks, 0);
+    const avgCtr          = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+    const cpmAds          = adsToDisplay.filter((a) => a.cpm > 0);
+    const avgCpm          = cpmAds.length > 0 ? cpmAds.reduce((s, a) => s + a.cpm, 0) / cpmAds.length : 0;
+    const cpcAds          = adsToDisplay.filter((a) => a.cpc > 0);
+    const avgCpc          = cpcAds.length > 0 ? cpcAds.reduce((s, a) => s + a.cpc, 0) / cpcAds.length : 0;
+
+    // ── Build data for GPT (text only — scoring already done) ──
+    const gptData = sorted.map((a) => ({
       id: a.id,
       name: a.name,
+      score: a.score,
+      classification: topIds.has(a.id) ? "top_performer" : "underperformer",
       status: a.status,
       campaign: a.campaign_name,
       headline: a.headline || null,
@@ -294,206 +318,134 @@ export async function GET(req: NextRequest) {
         impressions: a.impressions,
         clicks: a.clicks,
         ctr_pct: parseFloat(a.ctr.toFixed(4)),
-        cpc_dollars: a.cpc > 0 ? parseFloat(a.cpc.toFixed(2)) : null,
-        cpm_dollars: a.cpm > 0 ? parseFloat(a.cpm.toFixed(2)) : null,
+        cpc: a.cpc > 0 ? parseFloat(a.cpc.toFixed(2)) : null,
+        cpm: a.cpm > 0 ? parseFloat(a.cpm.toFixed(2)) : null,
         reach: a.reach,
         frequency: parseFloat(a.frequency.toFixed(2)),
       },
     }));
 
-    // ── Rule-based fallback (used when OpenAI unavailable) ──
+    // ── Rule-based fallback ──
     function ruleBasedAnalysis(): Record<string, unknown> {
-      const maxCtr2 = Math.max(...ads.map((a) => a.ctr), 0.001);
-      const maxClicks2 = Math.max(...ads.map((a) => a.clicks), 1);
-      const cpcList = ads.filter((a) => a.cpc > 0);
-      const minCpc2 = cpcList.length > 0 ? Math.min(...cpcList.map((a) => a.cpc)) : 1;
-
-      const fbScored = ads.map((a) => {
-        let score = 5;
-        if (a.impressions > 0 || a.spend > 0) {
-          score = Math.round(
-            (a.ctr / maxCtr2) * 50 +
-            (a.clicks / maxClicks2) * 30 +
-            (a.cpc > 0 ? Math.min((minCpc2 / a.cpc) * 20, 20) : 3)
-          );
-          score = Math.max(6, score);
-        }
-        return { ...a, score };
-      }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
-      const fbTop = fbScored.filter((a) => (a.score ?? 0) >= 25 && (a.impressions > 0 || a.spend > 0)).slice(0, 3);
-      const safeTop = fbTop.length > 0 ? fbTop : fbScored.slice(0, 1);
-      const fbTopIds = new Set(safeTop.map((a) => a.id));
-      const fbUnder = fbScored.filter((a) => !fbTopIds.has(a.id));
-
-      const scoredAds = fbScored.map((a) => ({
-        ad_id: a.id,
-        score: a.score,
-        classification: fbTopIds.has(a.id) ? "top_performer" : "underperformer",
-      }));
-
-      const topName = safeTop[0]?.name || "your top ad";
-      const overview = `Your account has ${ads.length} ads with $${totalSpend.toFixed(2)} total spend and an avg CTR of ${avgCtr.toFixed(2)}%. "${topName}" is the strongest performer. The ${fbUnder.length} underperforming ads need creative and targeting improvements before additional spend.`;
+      const topName = topPerformers[0]?.name || "your top ad";
+      const overview = `Your account shows ${adsToDisplay.length} ads with $${totalSpend.toFixed(2)} spend and avg CTR ${avgCtr.toFixed(2)}%. "${topName}" is the strongest performer (score ${topPerformers[0]?.score ?? 0}). The ${underperformers.length} underperforming ads need creative or delivery improvements before additional spend.`;
       const insights = [
-        safeTop[0]?.ctr > 0
-          ? `"${safeTop[0].name}" achieves a ${safeTop[0].ctr.toFixed(2)}% CTR — the only ad generating real engagement. Concentrate budget here.`
-          : "No ad is generating clicks yet — all ads need hook rewrites before scaling budget.",
-        `${fbUnder.filter((a) => a.spend === 0 && a.impressions === 0).length} ads have never served. Check campaign status and budget before editing copy.`,
+        topPerformers[0]?.ctr > 0
+          ? `"${topPerformers[0].name}" has the highest CTR at ${topPerformers[0].ctr.toFixed(2)}% with ${topPerformers[0].clicks} clicks — concentrate budget here.`
+          : "No ad is generating clicks yet — all need hook rewrites before scaling budget.",
+        `${underperformers.filter((a) => a.spend === 0 && a.impressions === 0).length} ads have never served. Check campaign status and set a minimum $5/day budget before editing copy.`,
         avgCtr < 0.3
-          ? "Average CTR is critically low (<0.3%). The first sentence of every ad needs a stronger hook — a number, question, or specific pain point."
-          : "CTR is at benchmark — focus on converting impressions by tightening the audience and CTA.",
+          ? "Average CTR is below 0.3%. The first sentence/frame of every ad needs a stronger hook — use a number, question, or direct pain point."
+          : "CTR is at benchmark — scale top performers and pause ads that haven't generated clicks in 7 days.",
       ];
-      const topNotes = safeTop.map((a) => ({
-        ad_id: a.id, ad_name: a.name,
+      const topNotes = topPerformers.map((a) => ({
+        ad_id: a.id,
+        ad_name: a.name,
         why_performing: a.ctr > 0
-          ? `CTR of ${a.ctr.toFixed(2)}% is the strongest in the account. ${a.headline ? `The headline "${a.headline.slice(0, 60)}" is resonating.` : "Creative format is matching audience expectations."} Increase budget to $15–20/day.`
-          : `Highest composite score. Increase to $15/day to exit the learning phase and get reliable CTR data.`,
+          ? `CTR ${a.ctr.toFixed(2)}% is the strongest in this set. ${a.headline ? `Headline "${a.headline.slice(0, 60)}" is resonating with the audience.` : "Creative format is matching audience expectations."} CPM $${a.cpm.toFixed(2)} shows efficient delivery. Increase budget to $15–20/day.`
+          : `Highest score in the set. Increase to $15/day to gather enough data for a reliable CTR read.`,
       }));
-
-      const underSugg = fbUnder.map((a) => {
-        const camp = a.campaign_name.split(" ")[0] || "health";
-        // Only return suggestions relevant to the actual problem
+      const underSugg = underperformers.map((a) => {
         if (a.impressions === 0 && a.spend === 0) {
           return {
-            ad_id: a.id, ad_name: a.name,
-            issue: "Ad has never served — campaign or ad set is paused / budget is $0. Fix delivery first before any creative changes.",
-            headline_suggestion: null,
-            body_suggestion: null,
-            cta_suggestion: null,
-            targeting_suggestion: "Once active: start with Advantage+ audience, Reels + Feed placement, age 30–55. Let Meta optimise delivery for 3 days.",
-            budget_suggestion: "Set a minimum $5/day budget and activate the campaign. Judge creative only after 500 impressions.",
+            ad_id: a.id, ad_name: a.name, pattern: "A",
+            issue: `Ad "${a.name}" has never served ($0 spend, 0 impressions). Campaign or ad set is paused, or budget is $0. Fix delivery before any copy changes.`,
+            headline_suggestion: null, body_suggestion: null, cta_suggestion: null,
+            targeting_suggestion: "Once active: use Advantage+ audience, Reels + Feed placement, age 30–55. Let Meta optimise for 3 days.",
+            budget_suggestion: "Set a minimum $5/day budget and activate the campaign. Evaluate creative only after 500 impressions.",
           };
         } else if (a.ctr === 0 && a.spend > 0) {
           return {
-            ad_id: a.id, ad_name: a.name,
-            issue: `Spent $${a.spend.toFixed(2)} with 0 clicks — the hook is not stopping the scroll. First 3 seconds / first line is the problem.`,
+            ad_id: a.id, ad_name: a.name, pattern: "B",
+            issue: `"${a.name}" spent $${a.spend.toFixed(2)} with ${a.impressions.toLocaleString()} impressions and 0 clicks. The hook is not stopping the scroll.`,
             headline_suggestion: a.headline
-              ? `Current: "${a.headline.slice(0, 60)}" → try: "Are you paying 3× too much for ${camp}?" or "How [City] patients save 70% on ${camp} abroad"`
-              : `Try a specific number or question: "5 ${camp} patients who saved $8,000 — here's exactly what they did"`,
+              ? `Current: "${a.headline.slice(0, 60)}" — rewrite to open with a specific number or question: "[X patients saved [amount] on [procedure] — here's how]"`
+              : "[Open with a bold question or specific number. Example: 'Are you overpaying for [procedure]? Here's how patients save [amount]']",
             body_suggestion: a.body
-              ? `Current opens with: "${a.body.slice(0, 50)}..." — rewrite to lead with the outcome, not the service. Example: "Sarah saved $9,000 on her surgery. No compromises. JCI-accredited care. Here's how."`
-              : "Lead with the viewer's desired result. Sentence 2: one specific proof point or stat. Sentence 3: soft ask (LEARN_MORE, not BOOK NOW).",
-            cta_suggestion: "LEARN_MORE — lowest friction for a cold audience that hasn't clicked yet.",
+              ? `Current: "${a.body.slice(0, 50)}..." — rewrite to lead with the outcome, not the service. "[State the transformation first. Add one proof point. End with a low-friction ask.]"`
+              : "[Lead with viewer's desired result. Sentence 2: one specific proof point. Sentence 3: soft CTA.]",
+            cta_suggestion: "LEARN_MORE",
             targeting_suggestion: null,
-            budget_suggestion: `Pause this ad. Redirect its budget to "${safeTop[0]?.name || "top performer"}" while you rewrite the hook. Reactivate only after creative update.`,
+            budget_suggestion: `Pause now. Redirect budget to "${topPerformers[0]?.name || "top performer"}" while rewriting the hook. Reactivate only after creative update.`,
           };
         } else {
           return {
-            ad_id: a.id, ad_name: a.name,
-            issue: "Below-average CTR — ad is serving but audience relevance or body copy is weak.",
-            headline_suggestion: `Add urgency or specificity: "Only [X] consultation slots this month for ${camp} patients abroad"`,
-            body_suggestion: "Open with the viewer's desired outcome. Add one line of social proof. End with a benefit-focused CTA, not a generic one.",
-            cta_suggestion: "GET_QUOTE or BOOK_TRAVEL — stronger intent signal than LEARN_MORE for this stage.",
-            targeting_suggestion: "Narrow to 1% lookalike of website visitors or video viewers. Test age 30–55. Reels-only placement often outperforms Feed for healthcare video.",
-            budget_suggestion: `Hold current budget for 5 more days. If CTR stays below 0.3%, pause and refresh the creative.`,
+            ad_id: a.id, ad_name: a.name, pattern: "C",
+            issue: `"${a.name}" has CTR ${a.ctr.toFixed(2)}% with ${a.clicks} clicks — below account average. Audience match or body copy needs improvement.`,
+            headline_suggestion: null,
+            body_suggestion: null,
+            cta_suggestion: a.cta && !["LEARN_MORE", "GET_QUOTE"].includes(a.cta) ? "LEARN_MORE — lower friction for a cold audience" : null,
+            targeting_suggestion: "Switch to 1% lookalike of website visitors or video viewers. Test age 30–55. Reels-only placement often outperforms Feed for healthcare video.",
+            budget_suggestion: `Hold current budget for 5 more days. If CTR stays below 0.3%, pause and refresh creative.`,
           };
         }
       });
-
-      const rec = safeTop[0]
-        ? `Increase "${safeTop[0].name}" to $15–20/day immediately — it is your only converting ad. Pause all ${fbUnder.filter((a) => a.ctr === 0).length} zero-CTR ads, rewrite their hooks using the suggestions above, then reactivate at $5/day each to re-enter the learning phase.`
-        : "No ad is generating clicks. Rewrite hooks across all ads, activate with $5/day each, and measure CTR after 500 impressions before deciding which to scale.";
-
-      return { scored_ads: scoredAds, ai_overview: overview, key_insights: insights, top_performer_notes: topNotes, underperformer_suggestions: underSugg, overall_recommendation: rec };
+      const rec = topPerformers[0]
+        ? `Increase "${topPerformers[0].name}" budget to $15–20/day immediately — it is the only converting ad. Pause the ${underperformers.filter((a) => a.ctr === 0).length} zero-CTR ads, apply the suggestions above, then reactivate at $5/day each.`
+        : "No ad is generating clicks. Apply hook rewrites to all ads, activate at $5/day each, and measure CTR after 500 impressions before deciding which to scale.";
+      return { ai_overview: overview, key_insights: insights, top_performer_notes: topNotes, underperformer_suggestions: underSugg, overall_recommendation: rec };
     }
 
-    // ── GPT Analysis Prompt ──
-    const underList = rawForGpt.filter((a) => a.metrics.spend === 0 && a.metrics.impressions === 0
-      ? true  // definitely underperformer
-      : true  // include all — GPT will classify
-    );
-
+    // ── GPT prompt (text analysis only — scores and classification already determined) ──
     const analysisPrompt = `${META_ADS_CONTEXT}
 
 ---
 ## YOUR TASK
 
-You are analysing a Meta Ads account for a medical tourism / healthcare brand.
-Analyse every ad below, score it, classify it, and — for every underperformer — provide ONLY the changes that will actually move the metrics for that specific ad's problem pattern.
+Write a text analysis for a Meta Ads account (medical tourism / healthcare brand).
+The ads below have already been scored and classified by a deterministic formula.
+DO NOT change the scores or classifications — they are final.
+Your job: write the narrative text only.
 
-Filter: ${filter} | Period: ${datePreset} | Ads: ${ads.length}${note ? ` | Analyst note: ${note}` : ""}
+Filter applied: ${filter} | Period: ${datePreset} | Ads shown: ${sorted.length}${note ? ` | Analyst note: ${note}` : ""}
 
-Account totals:
-- Total spend: $${totalSpend.toFixed(2)}
-- Total impressions: ${totalImpressions.toLocaleString()}
-- Total clicks: ${totalClicks}
-- Avg CTR: ${avgCtr.toFixed(4)}%
-- Avg CPM: $${avgCpm.toFixed(2)}
-- Avg CPC: $${avgCpc.toFixed(2)}
+Account totals: spend=$${totalSpend.toFixed(2)} | impressions=${totalImpressions.toLocaleString()} | clicks=${totalClicks} | avg_ctr=${avgCtr.toFixed(4)}% | avg_cpm=$${avgCpm.toFixed(2)} | avg_cpc=$${avgCpc.toFixed(2)}
 
-ALL ADS (raw — no pre-scoring applied):
-${JSON.stringify(rawForGpt, null, 2)}
+ADS (pre-classified, sorted best → worst):
+${JSON.stringify(gptData, null, 2)}
 
 ---
-## SCORING RULES (apply the Meta fundamentals above)
+## SUGGESTION PATTERN RULES
 
-Scoring is RELATIVE — compare ads to each other, not to external benchmarks:
-- spend=0 AND impressions=0 → score 5 max, MUST be "underperformer"
-- spend>0, impressions>0, clicks=0, CTR=0% → score 8–25 max, "underperformer"
-- CTR > 0 and highest in this account → score ≥ 50, regardless of absolute value
-- Adjust ±10 for CPM and CPC efficiency relative to THIS account's average
+For underperformers, follow these patterns (only fill fields relevant to the pattern):
 
-CRITICAL — top_performer classification:
-- The ad with the highest CTR AND actual clicks in the account is ALWAYS "top_performer",
-  even if its absolute CTR is low by industry standards
-- An ad with 0 clicks and 0 impressions can NEVER be "top_performer"
-- If ALL ads have 0 clicks, classify only the single ad with most impressions as "top_performer"
-- You MUST classify at least 1 ad as "top_performer" (the best relative to others)
+PATTERN A (spend=0, impressions=0 — never served):
+  → issue + targeting_suggestion + budget_suggestion only
+  → headline/body/cta = null (ad hasn't run — copy changes are useless until delivery is fixed)
 
----
-## SUGGESTION RULES (critical — read carefully)
+PATTERN B (impressions>0, spend>0, clicks=0 — hook failing):
+  → issue + headline_suggestion + body_suggestion + budget_suggestion
+  → If headline/body data is null: use structural [bracket templates], NOT invented content
+  → targeting/cta = null unless CTA is clearly wrong
 
-For each underperformer, identify the PRIMARY PROBLEM pattern and return ONLY the fields that fix that problem.
-Leave all other fields as null.
+PATTERN C (clicks>0, CTR below 0.3%, high CPC):
+  → issue + targeting_suggestion + cta_suggestion
+  → headline/body = null (creative is working somewhat — audience is the problem)
 
-- PATTERN A (spend=0, impressions=0 — never served):
-  → Return ONLY: issue + targeting_suggestion + budget_suggestion
-  → Set headline_suggestion, body_suggestion, cta_suggestion to null
-  → REASON: The ad hasn't run. Copy changes are meaningless until delivery is fixed.
+PATTERN D (decent CTR but low impressions):
+  → issue + budget_suggestion + targeting_suggestion only (NOT a creative problem)
 
-- PATTERN B (impressions>0, spend>0, clicks=0, CTR=0% — hook failing):
-  → Return ONLY: issue + headline_suggestion + body_suggestion + budget_suggestion
-  → Set targeting_suggestion, cta_suggestion to null (unless CTA is clearly BOOK_NOW on cold audience)
-  → IMPORTANT: If headline/body data is null (not retrieved), write structural guidance using [brackets]
-    e.g. "[Open with a specific number: '5 patients saved $X on [procedure] — here is how']"
-    Do NOT invent specific medical procedures, prices, or claims you do not know from the ad data.
+PATTERN E (decent CTR, high CPC):
+  → issue + cta_suggestion + targeting_suggestion only
 
-- PATTERN C (clicks>0 but CTR < account avg, high CPC):
-  → Return ONLY: issue + targeting_suggestion + cta_suggestion
-  → Set headline_suggestion, body_suggestion to null
-
-- PATTERN D (CTR > 0 but very low impressions — delivery limited):
-  → Return ONLY: issue + budget_suggestion + targeting_suggestion
-
-- PATTERN E (decent CTR, high CPC relative to account):
-  → Return ONLY: issue + cta_suggestion + targeting_suggestion
-
-ABSOLUTE PROHIBITION — never invent:
-- Specific medical procedures (rhinoplasty, hair transplant, belly fat, etc.) unless they appear in the ad name/headline/body data
-- Specific prices or savings amounts ("save 70%", "$8,000") unless they appear in the ad data
-- Specific country names or clinic names unless present in the ad data
-- Any claim about the product/service not supported by the ad data provided
-
-When creative data is null, provide structural templates in [brackets] so the user can fill in their real content.
+ABSOLUTE RULE: Never invent specific procedures, prices, countries, or clinic names
+unless they appear in the ad's headline/body/story data. Use [bracket templates] instead.
 
 ---
-## REQUIRED JSON OUTPUT (return ONLY valid JSON, no markdown)
+## REQUIRED JSON (return ONLY valid JSON, no markdown)
 
 {
-  "scored_ads": [
-    { "ad_id": "<id>", "score": <0-100>, "classification": "top_performer" | "underperformer", "pattern": "A|B|C|D|E|top" }
-  ],
-  "ai_overview": "2-3 sentences: account health based on actual numbers, single biggest opportunity using real metrics, what is holding performance back",
+  "ai_overview": "2-3 sentences: account health using real numbers, single biggest opportunity, what is holding performance back",
   "key_insights": [
-    "Insight with the actual ad name and the exact metric numbers from the data",
-    "Why the top ad is outperforming others — based on its actual metrics, not invented copy",
-    "The one shared problem across all underperforming ads"
+    "Specific insight with actual ad name and real metric numbers from the data",
+    "Why the top performer is outperforming others — reference its actual metrics",
+    "The shared problem across underperforming ads"
   ],
   "top_performer_notes": [
     {
       "ad_id": "<id>",
       "ad_name": "<name>",
-      "why_performing": "Reference its actual metrics (CTR, clicks, CPM). If headline is available reference it. Do not invent content."
+      "why_performing": "Reference actual metrics (CTR %, clicks, CPM). Reference headline if available. No invented content."
     }
   ],
   "underperformer_suggestions": [
@@ -502,112 +454,62 @@ When creative data is null, provide structural templates in [brackets] so the us
       "ad_name": "<name>",
       "pattern": "A|B|C|D|E",
       "issue": "Root cause — specific to this ad's actual metrics (spend $X, impressions Y, clicks Z)",
-      "headline_suggestion": "<structural template in [brackets] if no headline data, OR null if pattern doesn't need it>",
-      "body_suggestion": "<structural template in [brackets] if no body data, OR null if pattern doesn't need it>",
+      "headline_suggestion": "<structural template in [brackets] OR null>",
+      "body_suggestion": "<structural template in [brackets] OR null>",
       "cta_suggestion": "<specific CTA button name OR null>",
       "targeting_suggestion": "<specific audience action OR null>",
       "budget_suggestion": "<concrete $ action OR null>"
     }
   ],
-  "overall_recommendation": "The single highest-ROI action — name the specific ad, exact budget move, based on real data"
+  "overall_recommendation": "Single highest-ROI action — specific ad name, exact budget move, based on real numbers"
 }
 
 HARD RULES:
-1. scored_ads MUST have exactly ${ads.length} entries — one per ad, no duplicates, no omissions
-2. underperformer_suggestions MUST have one entry for EVERY ad_id classified as "underperformer"
-3. top_performer_notes MUST have one entry for EVERY ad_id classified as "top_performer"
-4. Every insight and suggestion must be grounded in the actual metric numbers provided — no invented data
-5. null fields are correct — only populate a field if it directly addresses that pattern's root cause`;
+1. top_performer_notes must have exactly ${topPerformers.length} entries — one per top performer
+2. underperformer_suggestions must have exactly ${underperformers.length} entries — one per underperformer
+3. Every insight and suggestion must be grounded in the actual metric numbers provided
+4. null fields are correct — only populate if it directly addresses that pattern's root cause`;
 
-    // ── Validation Prompt ──
-    function buildValidationPrompt(analysis: Record<string, unknown>): string {
-      const classified = (analysis.scored_ads as Array<{ ad_id: string; score: number; classification: string; pattern: string }> || []);
-      const underIds = classified.filter((s) => s.classification === "underperformer").map((s) => s.ad_id);
-      const topIds = classified.filter((s) => s.classification === "top_performer").map((s) => s.ad_id);
-      const suggIds = (analysis.underperformer_suggestions as Array<{ ad_id: string }> || []).map((s) => s.ad_id);
-      const missingSugg = underIds.filter((id) => !suggIds.includes(id));
-      const missingTop = topIds.filter((id) => !(analysis.top_performer_notes as Array<{ ad_id: string }> || []).map((n) => n.ad_id).includes(id));
-
-      return `${META_ADS_CONTEXT}
-
----
-## VALIDATION TASK
-
-You are a quality-control agent. The analysis below was produced by another GPT instance. Fix any issues.
-
-ORIGINAL AD DATA (for reference):
-${JSON.stringify(rawForGpt.map((a) => ({ id: a.id, name: a.name, metrics: a.metrics })), null, 2)}
-
-ANALYSIS TO VALIDATE:
-${JSON.stringify(analysis, null, 2)}
-
-ISSUES TO FIX:
-${classified.length !== ads.length ? `1. scored_ads has ${classified.length} entries but there are ${ads.length} ads. Add missing ads with score=5, classification="underperformer", pattern="A".` : "1. scored_ads count OK."}
-${missingSugg.length > 0 ? `2. underperformer_suggestions is MISSING entries for these ad_ids: ${missingSugg.join(", ")}. Add them now using the pattern rules.` : "2. underperformer_suggestions complete."}
-${missingTop.length > 0 ? `3. top_performer_notes is MISSING entries for these ad_ids: ${missingTop.join(", ")}. Add them.` : "3. top_performer_notes complete."}
-4. Verify: any ad with spend=0 AND impressions=0 must be "underperformer". Fix if wrong.
-5. Verify: Pattern A ads (never served) must have null for headline_suggestion, body_suggestion, cta_suggestion. Fix if wrong.
-6. Verify: the ad with the highest CTR and actual clicks is classified "top_performer". Fix if it is incorrectly classified as underperformer.
-7. Verify: no suggestion text mentions a specific medical procedure, price, country, or clinic name that is NOT present in the original ad data. If found, replace with a structural template in [brackets].
-8. Verify: all non-null suggestion fields have actual content (not empty strings). Fill if blank using the pattern rules.
-
-Return the COMPLETE corrected JSON in the exact same structure. Do not remove any data that is already correct.`;
-    }
-
-    // ── Run GPT ──
+    // ── Run GPT (text only) ──
     let ai: Record<string, unknown> = {};
     let aiError = "";
 
     if (OPENAI_KEY) {
-      // Call 1: Full analysis with scoring + suggestions
       try {
-        ai = await callOpenAI(analysisPrompt, 5000, "analysis");
+        ai = await callOpenAI(analysisPrompt, 4000, "analysis");
       } catch (e) {
-        aiError = `Analysis: ${e instanceof Error ? e.message : String(e)}`;
+        aiError = `GPT failed: ${e instanceof Error ? e.message : String(e)}`;
         console.error("[report-analysis]", aiError);
-      }
-
-      // Call 2: Validator agent — only if analysis call succeeded
-      if (ai.scored_ads) {
-        try {
-          const validated = await callOpenAI(buildValidationPrompt(ai), 4000, "validator");
-          if (validated.scored_ads) {
-            ai = validated;
-          }
-        } catch (e) {
-          // Non-fatal — use the unvalidated analysis
-          console.warn("[report-analysis/validator]", e instanceof Error ? e.message : String(e));
-        }
       }
     } else {
       aiError = "OPENAI_API_KEY not configured — using rule-based analysis";
       console.warn("[report-analysis]", aiError);
     }
 
-    // Fall back if GPT failed completely
-    if (!ai.scored_ads) {
+    // Fall back to rule-based if GPT failed
+    if (!ai.ai_overview) {
       ai = ruleBasedAnalysis();
       if (aiError) aiError += " (rule-based fallback applied)";
     }
 
-    // ── Merge GPT scores back into ad objects ──
-    const scoreMap = new Map<string, { score: number; classification: string }>();
-    for (const sa of (ai.scored_ads as Array<{ ad_id: string; score: number; classification: string }> || [])) {
-      if (sa?.ad_id) scoreMap.set(sa.ad_id, { score: Math.round(sa.score ?? 5), classification: sa.classification ?? "underperformer" });
+    // ── Fill any suggestions GPT missed (code-side patch, no second GPT call) ──
+    const existingSuggIds = new Set(
+      (ai.underperformer_suggestions as Array<{ ad_id: string }> || []).map((s) => s.ad_id)
+    );
+    const missedUnder = underperformers.filter((a) => !existingSuggIds.has(a.id));
+    if (missedUnder.length > 0) {
+      const fbSugg = (ruleBasedAnalysis().underperformer_suggestions as Array<{ ad_id: string }> || []);
+      const fbMap = new Map(fbSugg.map((s) => [s.ad_id, s]));
+      const patched = missedUnder.map((a) => fbMap.get(a.id)).filter(Boolean);
+      ai.underperformer_suggestions = [
+        ...(ai.underperformer_suggestions as unknown[] || []),
+        ...patched,
+      ];
     }
-
-    const allAdsScored = ads.map((a) => {
-      const gs = scoreMap.get(a.id) || { score: 5, classification: "underperformer" };
-      return { ...a, score: gs.score, _classification: gs.classification };
-    }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
-    type ScoredAd = Ad & { score: number; _classification: string };
-    const topAds = (allAdsScored as ScoredAd[]).filter((a) => a._classification === "top_performer");
-    const underAds = (allAdsScored as ScoredAd[]).filter((a) => a._classification !== "top_performer");
 
     return NextResponse.json({
       summary: {
-        total_ads: ads.length,
+        total_ads: adsToDisplay.length,
         total_spend: parseFloat(totalSpend.toFixed(2)),
         total_impressions: totalImpressions,
         total_clicks: totalClicks,
@@ -615,9 +517,9 @@ Return the COMPLETE corrected JSON in the exact same structure. Do not remove an
         avg_cpm: parseFloat(avgCpm.toFixed(2)),
         avg_cpc: parseFloat(avgCpc.toFixed(2)),
       },
-      top_performers: topAds,
-      underperformers: underAds,
-      all_ads: allAdsScored,
+      top_performers: topPerformers,
+      underperformers: underperformers,
+      all_ads: sorted,
       ai_overview: (ai.ai_overview as string) || "",
       key_insights: (ai.key_insights as string[]) || [],
       top_performer_notes: (ai.top_performer_notes as unknown[]) || [],
