@@ -704,6 +704,9 @@ export default function Dashboard() {
   const [reportDatePreset, setReportDatePreset] = useState("30d");
   const [reportCampaignId, setReportCampaignId] = useState("");
   const [reportCampaigns, setReportCampaigns] = useState<any[]>([]);
+  // Overview filters
+  const [overviewDatePreset, setOverviewDatePreset] = useState("all");
+  const [overviewCampaignId, setOverviewCampaignId] = useState("");
   const [reportLiveAds, setReportLiveAds] = useState<any[]>([]);
   const [reportLiveLoading, setReportLiveLoading] = useState(false);
 
@@ -1033,11 +1036,13 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMetaInsights = useCallback(async () => {
+  const fetchMetaInsights = useCallback(async (datePreset = "maximum", campaignId = "") => {
     setMetaReportsLoading(true);
     setMetaReportsError("");
     try {
-      const res = await fetch("/api/meta/reports");
+      const params = new URLSearchParams({ date_preset: datePreset });
+      if (campaignId) params.set("campaign_id", campaignId);
+      const res = await fetch(`/api/meta/reports?${params}`);
       const data = await res.json();
       if (res.ok) {
         setMetaInsights(data.account || { spend: 0, impressions: 0, reach: 0, linkClicks: 0, inline_link_click_ctr: 0, leads: 0 });
@@ -1110,6 +1115,13 @@ export default function Dashboard() {
     }
     setReportLoading(false);
   }, [reportFilter, reportNote, reportDatePreset, reportCampaignId]);
+
+  // Re-fetch overview insights when date/campaign filter changes (only while on overview tab)
+  useEffect(() => {
+    if (tab !== "overview") return;
+    const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
+    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
+  }, [overviewDatePreset, overviewCampaignId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load campaigns list when Report Analysis tab opens
   useEffect(() => {
@@ -1293,9 +1305,10 @@ export default function Dashboard() {
       fetchLiveCampaigns();
     }
     if (tab === "reports" || tab === "overview") {
-      fetchMetaInsights();
+      const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
+      fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
     }
-  }, [tab, fetchLiveCampaigns, fetchMetaInsights]);
+  }, [tab, fetchLiveCampaigns, fetchMetaInsights, overviewDatePreset, overviewCampaignId]);
 
   // Auto-refresh every 30s while any campaign/adset/ad is IN_PROCESS
   useEffect(() => {
@@ -3051,6 +3064,49 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* ── Overview Filters ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, background: 'rgba(248,250,252,0.97)', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 16px' }}>
+              {/* Date pills */}
+              {([["all", "All Time"], ["7d", "7 Days"], ["30d", "30 Days"], ["90d", "90 Days"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setOverviewDatePreset(val)}
+                  style={{
+                    padding: '5px 13px', borderRadius: 20, border: '1.5px solid',
+                    borderColor: overviewDatePreset === val ? '#7c3aed' : '#e2e8f0',
+                    background: overviewDatePreset === val ? '#7c3aed' : '#f1f5f9',
+                    color: overviewDatePreset === val ? '#fff' : '#64748b',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+
+              <div style={{ width: 1, height: 22, background: '#e2e8f0', flexShrink: 0 }} />
+
+              {/* Campaign dropdown */}
+              <select
+                value={overviewCampaignId}
+                onChange={(e) => setOverviewCampaignId(e.target.value)}
+                style={{
+                  padding: '5px 10px', borderRadius: 20,
+                  border: '1.5px solid',
+                  borderColor: overviewCampaignId ? '#0ea5e9' : '#e2e8f0',
+                  background: overviewCampaignId ? '#e0f2fe' : '#f1f5f9',
+                  color: overviewCampaignId ? '#0369a1' : '#64748b',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none', maxWidth: 220,
+                }}
+              >
+                <option value="">All Campaigns</option>
+                {metaCampaignInsights.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              {metaReportsLoading && <Spinner size={14} color="var(--primary)" />}
             </div>
 
             {/* Dash Body Panels */}
@@ -5950,7 +6006,7 @@ export default function Dashboard() {
               </div>
             </div>
             <button
-              onClick={fetchMetaInsights}
+              onClick={() => fetchMetaInsights()}
               disabled={metaReportsLoading}
               style={{
                 padding: "8px 16px", borderRadius: "10px", border: "1px solid var(--border)",
@@ -5976,7 +6032,7 @@ export default function Dashboard() {
                 <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Ready to load Meta Insights</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>Sync your live Facebook ad metrics into the dashboard.</div>
                 <button
-                  onClick={fetchMetaInsights}
+                  onClick={() => fetchMetaInsights()}
                   style={{
                     padding: "10px 24px", borderRadius: "var(--radius-md)", border: "none",
                     background: "var(--primary)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
