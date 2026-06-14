@@ -153,15 +153,18 @@ A 2× CTR improvement often halves CPM — CTR is the #1 lever.
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
-    const filter = searchParams.get("filter") || "both";
-    const note = searchParams.get("note") || "";
-    const datePreset = searchParams.get("date_preset") || "last_30d";
+    const filter     = searchParams.get("filter")      || "both";
+    const note       = searchParams.get("note")        || "";
+    const datePreset = searchParams.get("date_preset") || "last_30_d";
+    const dateFrom   = searchParams.get("date_from");   // custom range start (YYYY-MM-DD)
+    const dateTo     = searchParams.get("date_to");     // custom range end   (YYYY-MM-DD)
+    const campaignId = searchParams.get("campaign_id") || ""; // filter to specific campaign
 
     if (!TOKEN || !ACCOUNT) {
       return NextResponse.json({ error: "Missing Meta credentials" }, { status: 500 });
     }
 
-    // ── Fetch ALL ads (no filter at this stage) ──
+    // ── Fetch ALL ads (status filter applied later, after scoring) ──
     const adsRaw = await allPages(`act_${ACCOUNT}/ads`, {
       fields: "id,name,status,effective_status,campaign_id,adset_id,creative{id,title,body,call_to_action_type,image_url,thumbnail_url,video_id}",
       limit: "200",
@@ -173,15 +176,20 @@ export async function GET(req: NextRequest) {
     });
     const campMap = new Map(campaignsRaw.map((c) => [c.id as string, c.name as string]));
 
+    // ── Insights: use custom time_range if provided, else date_preset ──
     const insightFields = "ad_id,ad_name,spend,impressions,inline_link_clicks,inline_link_click_ctr,cost_per_inline_link_click,cpm,cpc,reach,frequency";
+    const insightParams: Record<string, string> = {
+      level: "ad", fields: insightFields, limit: "200",
+    };
+    if (dateFrom && dateTo) {
+      insightParams.time_range = JSON.stringify({ since: dateFrom, until: dateTo });
+    } else {
+      insightParams.date_preset = datePreset;
+    }
+
     let insightsRaw: Record<string, unknown>[] = [];
     try {
-      insightsRaw = await allPages(`act_${ACCOUNT}/insights`, {
-        level: "ad",
-        fields: insightFields,
-        date_preset: datePreset,
-        limit: "200",
-      });
+      insightsRaw = await allPages(`act_${ACCOUNT}/insights`, insightParams);
     } catch { /* no spend in period */ }
     const insightMap = new Map(insightsRaw.map((i) => [i.ad_id as string, i]));
 
@@ -256,10 +264,14 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // ── Apply filter for display only (scores already locked in) ──
+    // ── Apply filter for display (scores already locked in above) ──
+    // Filters are applied in order: status → campaign
     const adsToDisplay = allNormalized.filter((ad) => {
-      if (filter === "live")   return ad.status === "ACTIVE";
-      if (filter === "paused") return ["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(ad.status);
+      // Status filter
+      if (filter === "live"   && ad.status !== "ACTIVE") return false;
+      if (filter === "paused" && !["PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"].includes(ad.status)) return false;
+      // Campaign filter (empty string = all campaigns)
+      if (campaignId && ad.campaign_id !== campaignId) return false;
       return true;
     });
 

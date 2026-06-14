@@ -701,6 +701,11 @@ export default function Dashboard() {
   const [reportStep, setReportStep] = useState(0); // 0 = idle, 1–5 = progress
   const [reportResult, setReportResult] = useState<any>(null);
   const [reportError, setReportError] = useState("");
+  const [reportDatePreset, setReportDatePreset] = useState("30d");
+  const [reportCampaignId, setReportCampaignId] = useState("");
+  const [reportCampaigns, setReportCampaigns] = useState<any[]>([]);
+  const [reportLiveAds, setReportLiveAds] = useState<any[]>([]);
+  const [reportLiveLoading, setReportLiveLoading] = useState(false);
 
 
   function resetCreateTabWorkspace() {
@@ -1070,11 +1075,19 @@ export default function Dashboard() {
     ];
 
     try {
-      const params = new URLSearchParams({
-        filter: reportFilter,
-        note: reportNote,
-        date_preset: "last_30d",
-      });
+      const params = new URLSearchParams({ filter: reportFilter, note: reportNote });
+      // Date range
+      if (reportDatePreset === "15d") {
+        const until = new Date().toISOString().split("T")[0];
+        const since = new Date(Date.now() - 15 * 86400000).toISOString().split("T")[0];
+        params.set("date_from", since);
+        params.set("date_to", until);
+      } else {
+        const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
+        params.set("date_preset", presetMap[reportDatePreset] || "last_30_d");
+      }
+      // Campaign filter
+      if (reportCampaignId) params.set("campaign_id", reportCampaignId);
       const res = await fetch(`/api/meta/report-analysis?${params}`);
       const data = await res.json();
       stepTimers.forEach(clearTimeout);
@@ -1096,7 +1109,28 @@ export default function Dashboard() {
       setReportStep(0);
     }
     setReportLoading(false);
-  }, [reportFilter, reportNote]);
+  }, [reportFilter, reportNote, reportDatePreset, reportCampaignId]);
+
+  // Auto-load live ads strip + campaigns list when Report Analysis tab opens
+  useEffect(() => {
+    if (tab !== "report_analysis") return;
+
+    // Load campaigns for the dropdown
+    if (reportCampaigns.length === 0) {
+      fetch("/api/meta/campaigns-list")
+        .then((r) => r.json())
+        .then((d) => { if (d.campaigns) setReportCampaigns(d.campaigns); })
+        .catch(() => {});
+    }
+
+    // Load live ads strip
+    setReportLiveLoading(true);
+    fetch("/api/meta/live-ads")
+      .then((r) => r.json())
+      .then((d) => { setReportLiveAds(d.ads || []); })
+      .catch(() => { setReportLiveAds([]); })
+      .finally(() => setReportLiveLoading(false));
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On mount: if analysisStatus is "generating" but no sessionStorage flag,
   // it means the page was refreshed mid-analysis — reset to idle so user can re-trigger
@@ -6205,6 +6239,38 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* ── Live Ads Strip (always visible) ── */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px #dcfce7' }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>LIVE ADS RIGHT NOW</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>— currently running on Meta</span>
+            </div>
+            {reportLiveLoading ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading live ads...</div>
+            ) : reportLiveAds.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No ads are currently active.</div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {reportLiveAds.map((ad: any) => (
+                  <div key={ad.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '7px 12px', minWidth: 0 }}>
+                    {ad.thumbnail_url ? (
+                      <img src={ad.thumbnail_url} style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
+                    ) : (
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: '#dcfce7', flexShrink: 0 }} />
+                    )}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        ${ad.spend.toFixed(2)} · {ad.impressions.toLocaleString()} impr · {ad.clicks} clicks
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* ── Error ── */}
           {reportError && (
             <Card style={{ background: "var(--red-light)", border: "1px solid var(--red-strong)" }}>
@@ -6510,62 +6576,115 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* ── Bottom bar — sticky inside <main>, never touches sidebar ── */}
+          {/* ── Bottom bar — sticky, redesigned ── */}
           <div style={{
             position: "sticky", bottom: 0, zIndex: 10,
-            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-            borderTop: "1px solid var(--border)",
-            padding: "14px 0",
-            display: "flex", alignItems: "center", gap: 12,
-            boxShadow: "0 -2px 16px rgba(0,0,0,0.06)",
+            background: "rgba(248,250,252,0.97)", backdropFilter: "blur(12px)",
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: "12px 16px",
+            display: "flex", flexDirection: "column", gap: 10,
+            boxShadow: "0 -2px 20px rgba(0,0,0,0.06)",
             marginTop: 8,
           }}>
-            {/* Filter buttons */}
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              {(["both", "live", "paused"] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setReportFilter(f)}
-                  style={{
-                    padding: "7px 14px", borderRadius: 20, border: "1.5px solid",
-                    borderColor: reportFilter === f ? "var(--primary)" : "var(--border)",
-                    background: reportFilter === f ? "var(--primary)" : "#fff",
-                    color: reportFilter === f ? "#fff" : "var(--text-muted)",
-                    fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize"
-                  }}
-                >
-                  {f === "both" ? "All Ads" : f === "live" ? "Live" : "Paused"}
-                </button>
-              ))}
+            {/* Row 1: Status + Date + Campaign */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {/* Status pills */}
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["both", "live", "paused"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setReportFilter(f)}
+                    style={{
+                      padding: "5px 12px", borderRadius: 20,
+                      border: "1.5px solid",
+                      borderColor: reportFilter === f ? "var(--primary)" : "#e2e8f0",
+                      background: reportFilter === f ? "var(--primary)" : "#f1f5f9",
+                      color: reportFilter === f ? "#fff" : "#64748b",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    {f === "both" ? "All" : f === "live" ? "Live" : "Paused"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div style={{ width: 1, height: 22, background: "#e2e8f0", flexShrink: 0 }} />
+
+              {/* Date range pills */}
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["7d", "15d", "30d", "90d"] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setReportDatePreset(d)}
+                    style={{
+                      padding: "5px 12px", borderRadius: 20,
+                      border: "1.5px solid",
+                      borderColor: reportDatePreset === d ? "#7c3aed" : "#e2e8f0",
+                      background: reportDatePreset === d ? "#7c3aed" : "#f1f5f9",
+                      color: reportDatePreset === d ? "#fff" : "#64748b",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    {d === "7d" ? "7 days" : d === "15d" ? "15 days" : d === "30d" ? "30 days" : "90 days"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div style={{ width: 1, height: 22, background: "#e2e8f0", flexShrink: 0 }} />
+
+              {/* Campaign dropdown */}
+              <select
+                value={reportCampaignId}
+                onChange={(e) => setReportCampaignId(e.target.value)}
+                style={{
+                  padding: "5px 10px", borderRadius: 20,
+                  border: "1.5px solid",
+                  borderColor: reportCampaignId ? "#0ea5e9" : "#e2e8f0",
+                  background: reportCampaignId ? "#e0f2fe" : "#f1f5f9",
+                  color: reportCampaignId ? "#0369a1" : "#64748b",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  outline: "none", maxWidth: 200,
+                }}
+              >
+                <option value="">All Campaigns</option>
+                {reportCampaigns.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
-            {/* Text input */}
-            <input
-              type="text"
-              value={reportNote}
-              onChange={(e) => setReportNote(e.target.value)}
-              placeholder="Add a note or focus area (optional)..."
-              style={{
-                flex: 1, padding: "9px 16px", borderRadius: "var(--radius-md)",
-                border: "1.5px solid var(--border)", fontSize: 13, background: "#fff",
-                color: "var(--text)", outline: "none",
-              }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !reportLoading) handleRunReport(); }}
-            />
-            {/* Analyse button */}
-            <button
-              onClick={handleRunReport}
-              disabled={reportLoading}
-              style={{
-                padding: "9px 24px", borderRadius: "var(--radius-md)", border: "none",
-                background: reportLoading ? "var(--border)" : "var(--primary)",
-                color: reportLoading ? "var(--text-muted)" : "#fff",
-                fontSize: 13, fontWeight: 700, cursor: reportLoading ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-                transition: "all 0.2s", boxShadow: reportLoading ? "none" : "0 4px 12px rgba(2,132,199,0.25)"
-              }}
-            >
-              {reportLoading ? <><Spinner size={14} color="var(--text-muted)" /> Analysing...</> : "Analyse"}
-            </button>
+
+            {/* Row 2: Note + Analyse */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="text"
+                value={reportNote}
+                onChange={(e) => setReportNote(e.target.value)}
+                placeholder="Add a note or focus area (optional)..."
+                style={{
+                  flex: 1, padding: "8px 14px", borderRadius: 10,
+                  border: "1.5px solid #e2e8f0", fontSize: 13, background: "#fff",
+                  color: "var(--text)", outline: "none",
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !reportLoading) handleRunReport(); }}
+              />
+              <button
+                onClick={handleRunReport}
+                disabled={reportLoading}
+                style={{
+                  padding: "8px 22px", borderRadius: 10, border: "none",
+                  background: reportLoading ? "#e2e8f0" : "var(--primary)",
+                  color: reportLoading ? "#94a3b8" : "#fff",
+                  fontSize: 13, fontWeight: 700, cursor: reportLoading ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                  transition: "all 0.2s", boxShadow: reportLoading ? "none" : "0 4px 12px rgba(2,132,199,0.25)"
+                }}
+              >
+                {reportLoading ? <><Spinner size={14} color="#94a3b8" /> Analysing...</> : "Analyse"}
+              </button>
+            </div>
           </div>
         </div>
       )}
