@@ -1111,19 +1111,19 @@ export default function Dashboard() {
     setReportLoading(false);
   }, [reportFilter, reportNote, reportDatePreset, reportCampaignId]);
 
-  // Auto-load live ads strip + campaigns list when Overview or Report Analysis tab opens
+  // Auto-load campaigns list when Report Analysis tab opens
   useEffect(() => {
-    if (tab !== "report_analysis" && tab !== "overview") return;
-
-    // Load campaigns for the dropdown (report analysis only)
     if (tab === "report_analysis" && reportCampaigns.length === 0) {
       fetch("/api/meta/campaigns-list")
         .then((r) => r.json())
         .then((d) => { if (d.campaigns) setReportCampaigns(d.campaigns); })
         .catch(() => {});
     }
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Load live ads strip (both tabs)
+  // Auto-load live ads strip when Overview tab opens
+  useEffect(() => {
+    if (tab !== "overview") return;
     setReportLiveLoading(true);
     fetch("/api/meta/live-ads")
       .then((r) => r.json())
@@ -6269,38 +6269,6 @@ export default function Dashboard() {
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
               AI-powered analysis of your Meta Ads performance with per-ad improvement suggestions.
             </div>
-          </div>
-
-          {/* ── Live Ads Strip (always visible) ── */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px #dcfce7' }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>LIVE ADS RIGHT NOW</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>— currently running on Meta</span>
-            </div>
-            {reportLiveLoading ? (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading live ads...</div>
-            ) : reportLiveAds.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No ads are currently active.</div>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {reportLiveAds.map((ad: any) => (
-                  <div key={ad.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '7px 12px', minWidth: 0 }}>
-                    {ad.thumbnail_url ? (
-                      <img src={ad.thumbnail_url} style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
-                    ) : (
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: '#dcfce7', flexShrink: 0 }} />
-                    )}
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        ${ad.spend.toFixed(2)} · {ad.impressions.toLocaleString()} impr · {ad.clicks} clicks
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* ── Error ── */}
