@@ -1116,13 +1116,6 @@ export default function Dashboard() {
     setReportLoading(false);
   }, [reportFilter, reportNote, reportDatePreset, reportCampaignId]);
 
-  // Re-fetch overview insights when date/campaign filter changes (only while on overview tab)
-  useEffect(() => {
-    if (tab !== "overview") return;
-    const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
-    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
-  }, [overviewDatePreset, overviewCampaignId]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Auto-load campaigns list when Report Analysis tab opens
   useEffect(() => {
     if (tab === "report_analysis" && reportCampaigns.length === 0) {
@@ -3034,38 +3027,6 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* ── Live Ads Strip ── */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '12px 18px', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: reportLiveAds.length > 0 ? 10 : 0 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px #dcfce7' }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>LIVE ADS RIGHT NOW</span>
-                {reportLiveAds.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>— {reportLiveAds.length} ad{reportLiveAds.length !== 1 ? 's' : ''} currently running</span>}
-              </div>
-              {reportLiveLoading ? (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading live ads...</div>
-              ) : reportLiveAds.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No ads are currently active.</div>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {reportLiveAds.map((ad: any) => (
-                    <div key={ad.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '7px 12px' }}>
-                      {ad.thumbnail_url ? (
-                        <img src={ad.thumbnail_url} style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
-                      ) : (
-                        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#dcfce7', flexShrink: 0 }} />
-                      )}
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          ${ad.spend.toFixed(2)} · {ad.impressions.toLocaleString()} impr · {ad.ctr.toFixed(2)}% CTR
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* ── Overview Filters ── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, background: 'rgba(248,250,252,0.97)', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 16px' }}>
               {/* Date pills */}
@@ -3106,7 +3067,24 @@ export default function Dashboard() {
                 ))}
               </select>
 
-              {metaReportsLoading && <Spinner size={14} color="var(--primary)" />}
+              <div style={{ marginLeft: 'auto' }}>
+                <button
+                  onClick={() => {
+                    const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
+                    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
+                  }}
+                  disabled={metaReportsLoading}
+                  style={{
+                    padding: '6px 18px', borderRadius: 20, border: 'none',
+                    background: metaReportsLoading ? '#e2e8f0' : 'var(--primary)',
+                    color: metaReportsLoading ? '#94a3b8' : '#fff',
+                    fontSize: 12, fontWeight: 700, cursor: metaReportsLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+                  }}
+                >
+                  {metaReportsLoading ? <><Spinner size={12} color="#94a3b8" /> Searching...</> : "Search"}
+                </button>
+              </div>
             </div>
 
             {/* Dash Body Panels */}
@@ -3164,6 +3142,54 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div style={{ padding: "20px 0", fontSize: 13, color: "var(--text-muted)" }}>No campaigns are currently tracking performance data.</div>
+                  )}
+                </Card>
+
+                {/* Live Ads Card */}
+                <Card style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 3px #dcfce7', flexShrink: 0 }} />
+                    <SectionTitle style={{ margin: 0, color: '#15803d' }}>Live Ads</SectionTitle>
+                    {reportLiveAds.length > 0 && (
+                      <span style={{ fontSize: 11, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
+                        {reportLiveAds.length} running
+                      </span>
+                    )}
+                  </div>
+                  {reportLiveLoading ? (
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}><Spinner size={14} color="var(--primary)" /> Loading...</div>
+                  ) : reportLiveAds.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No ads are currently active.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {reportLiveAds.map((ad: any) => (
+                        <div key={ad.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '1px solid #bbf7d0', borderRadius: 10, padding: '9px 12px' }}>
+                          {ad.thumbnail_url ? (
+                            <img src={ad.thumbnail_url} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
+                          ) : (
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#dcfce7', flexShrink: 0 }} />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{ad.campaign_name}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 14, flexShrink: 0, textAlign: 'right' }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>SPEND</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>${ad.spend.toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>IMPR</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{ad.impressions.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>CTR</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>{ad.ctr.toFixed(2)}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </Card>
 
