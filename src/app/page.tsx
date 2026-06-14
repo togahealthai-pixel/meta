@@ -3115,35 +3115,6 @@ export default function Dashboard() {
                   </div>
                 </Card>
 
-                {/* Top Performer Campaign */}
-                <Card style={{ position: "relative", overflow: "hidden", border: "1px solid #bbf7d0", background: "#f0fdf4" }}>
-                  <div style={{ position: "absolute", top: -20, right: -20, fontSize: 80, opacity: 0.1 }}>🏆</div>
-                  <SectionTitle style={{ color: "var(--green-strong)" }}>Top Performing Campaign</SectionTitle>
-
-                  {topPerformer ? (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 4, textTransform: "lowercase", display: "inline-block", background: "rgba(0,0,0,0.05)", padding: "2px 8px", borderRadius: 4 }}>{topPerformer.objective?.replace(/_/g, " ")}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 12 }}>{topPerformer.name}</div>
-
-                      <div className="flex flex-col sm:flex-row gap-4 lg:gap-5">
-                        <div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Spend</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>${parseFloat(topPerformer.insights?.spend || 0).toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>CTR (Link)</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--primary)" }}>{parseFloat(topPerformer.insights?.inline_link_click_ctr || 0).toFixed(2)}%</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Conversions</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--green)" }}>{topPerformer.insights?.leads || 0}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ padding: "20px 0", fontSize: 13, color: "var(--text-muted)" }}>No campaigns are currently tracking performance data.</div>
-                  )}
-                </Card>
 
                 {/* Live Ads Card */}
                 <Card style={{ border: '1px solid #bbf7d0', background: '#f0fdf4', padding: '18px 20px' }}>
