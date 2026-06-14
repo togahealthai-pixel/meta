@@ -26,7 +26,7 @@ export async function GET() {
 
     // Fetch insights for these ads (last 30 days)
     const insightFields = "ad_id,spend,impressions,inline_link_clicks,inline_link_click_ctr,cpm,cpc";
-    const insUrl = `${GRAPH}/act_${account}/insights?level=ad&fields=${insightFields}&date_preset=last_30_d&limit=200&access_token=${token}`;
+    const insUrl = `${GRAPH}/act_${account}/insights?level=ad&fields=${insightFields}&date_preset=maximum&limit=200&access_token=${token}`;
     const insRes = await fetch(insUrl);
     const insData = await insRes.json();
     const insightMap = new Map<string, Record<string, unknown>>(
