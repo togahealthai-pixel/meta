@@ -705,7 +705,8 @@ export default function Dashboard() {
   const [reportCampaignId, setReportCampaignId] = useState("");
   const [reportCampaigns, setReportCampaigns] = useState<any[]>([]);
   // Overview filters
-  const [overviewDatePreset, setOverviewDatePreset] = useState("all");
+  const [overviewDateFrom, setOverviewDateFrom] = useState("");
+  const [overviewDateTo, setOverviewDateTo] = useState("");
   const [overviewCampaignId, setOverviewCampaignId] = useState("");
   const [reportLiveAds, setReportLiveAds] = useState<any[]>([]);
   const [reportLiveLoading, setReportLiveLoading] = useState(false);
@@ -1036,11 +1037,17 @@ export default function Dashboard() {
     }
   };
 
-  const fetchMetaInsights = useCallback(async (datePreset = "maximum", campaignId = "") => {
+  const fetchMetaInsights = useCallback(async (datePreset = "maximum", campaignId = "", dateFrom = "", dateTo = "") => {
     setMetaReportsLoading(true);
     setMetaReportsError("");
     try {
-      const params = new URLSearchParams({ date_preset: datePreset });
+      const params = new URLSearchParams();
+      if (dateFrom && dateTo) {
+        params.set("date_from", dateFrom);
+        params.set("date_to", dateTo);
+      } else {
+        params.set("date_preset", datePreset);
+      }
       if (campaignId) params.set("campaign_id", campaignId);
       const res = await fetch(`/api/meta/reports?${params}`);
       const data = await res.json();
@@ -2994,22 +3001,40 @@ export default function Dashboard() {
 
             {/* ── Overview Filters — TOP ── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, background: 'rgba(248,250,252,0.97)', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 16px' }}>
-              {([["all", "All Time"], ["7d", "7 Days"], ["30d", "30 Days"], ["90d", "90 Days"]] as const).map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setOverviewDatePreset(val)}
+              {/* From date */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>FROM</span>
+                <input
+                  type="date"
+                  value={overviewDateFrom}
+                  onChange={(e) => setOverviewDateFrom(e.target.value)}
                   style={{
-                    padding: '5px 13px', borderRadius: 20, border: '1.5px solid',
-                    borderColor: overviewDatePreset === val ? '#7c3aed' : '#e2e8f0',
-                    background: overviewDatePreset === val ? '#7c3aed' : '#f1f5f9',
-                    color: overviewDatePreset === val ? '#fff' : '#64748b',
-                    fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                    padding: '5px 10px', borderRadius: 20, border: '1.5px solid',
+                    borderColor: overviewDateFrom ? '#7c3aed' : '#e2e8f0',
+                    background: overviewDateFrom ? '#f5f3ff' : '#f1f5f9',
+                    color: '#334155', fontSize: 12, fontWeight: 500, outline: 'none', cursor: 'pointer',
                   }}
-                >
-                  {label}
-                </button>
-              ))}
+                />
+              </div>
+              {/* To date */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>TO</span>
+                <input
+                  type="date"
+                  value={overviewDateTo}
+                  onChange={(e) => setOverviewDateTo(e.target.value)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 20, border: '1.5px solid',
+                    borderColor: overviewDateTo ? '#7c3aed' : '#e2e8f0',
+                    background: overviewDateTo ? '#f5f3ff' : '#f1f5f9',
+                    color: '#334155', fontSize: 12, fontWeight: 500, outline: 'none', cursor: 'pointer',
+                  }}
+                />
+              </div>
+
               <div style={{ width: 1, height: 22, background: '#e2e8f0', flexShrink: 0 }} />
+
+              {/* Campaign dropdown */}
               <select
                 value={overviewCampaignId}
                 onChange={(e) => setOverviewCampaignId(e.target.value)}
@@ -3026,12 +3051,29 @@ export default function Dashboard() {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <div style={{ marginLeft: 'auto' }}>
+
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                {/* Clear button */}
+                {(overviewDateFrom || overviewDateTo || overviewCampaignId) && (
+                  <button
+                    onClick={() => {
+                      setOverviewDateFrom("");
+                      setOverviewDateTo("");
+                      setOverviewCampaignId("");
+                      fetchMetaInsights("maximum", "");
+                    }}
+                    style={{
+                      padding: '6px 14px', borderRadius: 20, border: '1.5px solid #e2e8f0',
+                      background: '#fff', color: '#64748b',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+                {/* Search button */}
                 <button
-                  onClick={() => {
-                    const presetMap: Record<string, string> = { "7d": "last_7d", "30d": "last_30d", "90d": "last_90d" };
-                    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
-                  }}
+                  onClick={() => fetchMetaInsights("custom", overviewCampaignId, overviewDateFrom, overviewDateTo)}
                   disabled={metaReportsLoading}
                   style={{
                     padding: '6px 18px', borderRadius: 20, border: 'none',

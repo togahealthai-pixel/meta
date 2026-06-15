@@ -11,21 +11,31 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const datePreset = searchParams.get("date_preset") || "maximum";
   const campaignId = searchParams.get("campaign_id") || "";
+  const dateFrom = searchParams.get("date_from") || "";
+  const dateTo = searchParams.get("date_to") || "";
+  const useCustomRange = !!(dateFrom && dateTo);
+
+  // Build time param for flat URL params and for nested field syntax
+  const timeUrlParam = useCustomRange
+    ? `time_range=${encodeURIComponent(JSON.stringify({ since: dateFrom, until: dateTo }))}`
+    : `date_preset=${datePreset}`;
+  const nestedTimeParam = useCustomRange
+    ? `time_range({"since":"${dateFrom}","until":"${dateTo}"})`
+    : `date_preset(${datePreset})`;
 
   try {
     let accountInsightsUrl: string;
     if (campaignId) {
-      // When filtering by campaign, get that campaign's insights as account-level totals
-      accountInsightsUrl = `https://graph.facebook.com/v21.0/${campaignId}/insights?fields=spend,impressions,reach,clicks,inline_link_click_ctr,cpc,cpm,actions&date_preset=${datePreset}&access_token=${accessToken}`;
+      accountInsightsUrl = `https://graph.facebook.com/v21.0/${campaignId}/insights?fields=spend,impressions,reach,clicks,inline_link_click_ctr,cpc,cpm,actions&${timeUrlParam}&access_token=${accessToken}`;
     } else {
-      accountInsightsUrl = `https://graph.facebook.com/v21.0/act_${adAccountId}/insights?fields=spend,impressions,reach,clicks,inline_link_click_ctr,cpc,cpm,actions&date_preset=${datePreset}&access_token=${accessToken}`;
+      accountInsightsUrl = `https://graph.facebook.com/v21.0/act_${adAccountId}/insights?fields=spend,impressions,reach,clicks,inline_link_click_ctr,cpc,cpm,actions&${timeUrlParam}&access_token=${accessToken}`;
     }
 
     const accountRes = await fetch(accountInsightsUrl);
     const accountData = await accountRes.json();
 
     // Campaign-level breakdown
-    const fields = `id,name,status,effective_status,objective,insights.date_preset(${datePreset}){spend,impressions,reach,clicks,inline_link_click_ctr,actions},adsets{id,name,ads{id,name,status,effective_status,creative{thumbnail_url,image_url},insights.date_preset(${datePreset}){spend,impressions,clicks,inline_link_click_ctr,actions}}}`;
+    const fields = `id,name,status,effective_status,objective,insights.${nestedTimeParam}{spend,impressions,reach,clicks,inline_link_click_ctr,actions},adsets{id,name,ads{id,name,status,effective_status,creative{thumbnail_url,image_url},insights.${nestedTimeParam}{spend,impressions,clicks,inline_link_click_ctr,actions}}}`;
     let campaignInsightsUrl: string;
     if (campaignId) {
       campaignInsightsUrl = `https://graph.facebook.com/v21.0/${campaignId}?fields=${fields}&access_token=${accessToken}`;
@@ -52,7 +62,6 @@ export async function GET(request: Request) {
 
     const processedAccount = processInsights(accountData.data?.[0]);
 
-    // Handle single campaign response vs array
     const rawCampaigns = campaignId
       ? (campaignData.id ? [campaignData] : [])
       : (campaignData.data || []);
