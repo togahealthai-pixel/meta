@@ -1298,10 +1298,9 @@ export default function Dashboard() {
       fetchLiveCampaigns();
     }
     if (tab === "reports" || tab === "overview") {
-      const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
-      fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
+      fetchMetaInsights();
     }
-  }, [tab, fetchLiveCampaigns, fetchMetaInsights, overviewDatePreset, overviewCampaignId]);
+  }, [tab, fetchLiveCampaigns, fetchMetaInsights]);
 
   // Auto-refresh every 30s while any campaign/adset/ad is IN_PROCESS
   useEffect(() => {
@@ -2992,10 +2991,63 @@ export default function Dashboard() {
 
         return (
           <div className="animate-fade-in" style={{ paddingBottom: 40 }}>
+
+            {/* ── Overview Filters — TOP ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, background: 'rgba(248,250,252,0.97)', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 16px' }}>
+              {([["all", "All Time"], ["7d", "7 Days"], ["30d", "30 Days"], ["90d", "90 Days"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setOverviewDatePreset(val)}
+                  style={{
+                    padding: '5px 13px', borderRadius: 20, border: '1.5px solid',
+                    borderColor: overviewDatePreset === val ? '#7c3aed' : '#e2e8f0',
+                    background: overviewDatePreset === val ? '#7c3aed' : '#f1f5f9',
+                    color: overviewDatePreset === val ? '#fff' : '#64748b',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <div style={{ width: 1, height: 22, background: '#e2e8f0', flexShrink: 0 }} />
+              <select
+                value={overviewCampaignId}
+                onChange={(e) => setOverviewCampaignId(e.target.value)}
+                style={{
+                  padding: '5px 10px', borderRadius: 20, border: '1.5px solid',
+                  borderColor: overviewCampaignId ? '#0ea5e9' : '#e2e8f0',
+                  background: overviewCampaignId ? '#e0f2fe' : '#f1f5f9',
+                  color: overviewCampaignId ? '#0369a1' : '#64748b',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none', maxWidth: 220,
+                }}
+              >
+                <option value="">All Campaigns</option>
+                {metaCampaignInsights.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <div style={{ marginLeft: 'auto' }}>
+                <button
+                  onClick={() => {
+                    const presetMap: Record<string, string> = { "7d": "last_7d", "30d": "last_30d", "90d": "last_90d" };
+                    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
+                  }}
+                  disabled={metaReportsLoading}
+                  style={{
+                    padding: '6px 18px', borderRadius: 20, border: 'none',
+                    background: metaReportsLoading ? '#e2e8f0' : 'var(--primary)',
+                    color: metaReportsLoading ? '#94a3b8' : '#fff',
+                    fontSize: 12, fontWeight: 700, cursor: metaReportsLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+                  }}
+                >
+                  {metaReportsLoading ? <><Spinner size={12} color="#94a3b8" /> Searching...</> : "Search"}
+                </button>
+              </div>
+            </div>
+
             {/* Top Stat Ribbon */}
-            <div
-              className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5"
-            >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
               <MetricCard
                 label="Live campaigns"
                 value={totalCampaignsRendered}
@@ -3025,66 +3077,6 @@ export default function Dashboard() {
                 color="var(--text-muted)"
                 bg="var(--surface)"
               />
-            </div>
-
-            {/* ── Overview Filters ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, background: 'rgba(248,250,252,0.97)', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 16px' }}>
-              {/* Date pills */}
-              {([["all", "All Time"], ["7d", "7 Days"], ["30d", "30 Days"], ["90d", "90 Days"]] as const).map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setOverviewDatePreset(val)}
-                  style={{
-                    padding: '5px 13px', borderRadius: 20, border: '1.5px solid',
-                    borderColor: overviewDatePreset === val ? '#7c3aed' : '#e2e8f0',
-                    background: overviewDatePreset === val ? '#7c3aed' : '#f1f5f9',
-                    color: overviewDatePreset === val ? '#fff' : '#64748b',
-                    fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-
-              <div style={{ width: 1, height: 22, background: '#e2e8f0', flexShrink: 0 }} />
-
-              {/* Campaign dropdown */}
-              <select
-                value={overviewCampaignId}
-                onChange={(e) => setOverviewCampaignId(e.target.value)}
-                style={{
-                  padding: '5px 10px', borderRadius: 20,
-                  border: '1.5px solid',
-                  borderColor: overviewCampaignId ? '#0ea5e9' : '#e2e8f0',
-                  background: overviewCampaignId ? '#e0f2fe' : '#f1f5f9',
-                  color: overviewCampaignId ? '#0369a1' : '#64748b',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none', maxWidth: 220,
-                }}
-              >
-                <option value="">All Campaigns</option>
-                {metaCampaignInsights.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-
-              <div style={{ marginLeft: 'auto' }}>
-                <button
-                  onClick={() => {
-                    const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
-                    fetchMetaInsights(presetMap[overviewDatePreset] || "maximum", overviewCampaignId);
-                  }}
-                  disabled={metaReportsLoading}
-                  style={{
-                    padding: '6px 18px', borderRadius: 20, border: 'none',
-                    background: metaReportsLoading ? '#e2e8f0' : 'var(--primary)',
-                    color: metaReportsLoading ? '#94a3b8' : '#fff',
-                    fontSize: 12, fontWeight: 700, cursor: metaReportsLoading ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
-                  }}
-                >
-                  {metaReportsLoading ? <><Spinner size={12} color="#94a3b8" /> Searching...</> : "Search"}
-                </button>
-              </div>
             </div>
 
             {/* Dash Body Panels */}
