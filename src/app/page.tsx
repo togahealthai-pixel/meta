@@ -701,7 +701,7 @@ export default function Dashboard() {
   const [reportStep, setReportStep] = useState(0); // 0 = idle, 1–5 = progress
   const [reportResult, setReportResult] = useState<any>(null);
   const [reportError, setReportError] = useState("");
-  const [reportDatePreset, setReportDatePreset] = useState("30d");
+  const [reportDatePreset, setReportDatePreset] = useState("max");
   const [reportCampaignId, setReportCampaignId] = useState("");
   const [reportCampaigns, setReportCampaigns] = useState<any[]>([]);
   // Overview filters
@@ -1095,8 +1095,8 @@ export default function Dashboard() {
         params.set("date_from", since);
         params.set("date_to", until);
       } else {
-        const presetMap: Record<string, string> = { "7d": "last_7_d", "30d": "last_30_d", "90d": "last_90_d" };
-        params.set("date_preset", presetMap[reportDatePreset] || "last_30_d");
+        const presetMap: Record<string, string> = { "7d": "last_7d", "30d": "last_30d", "90d": "last_90d", "max": "maximum" };
+        params.set("date_preset", presetMap[reportDatePreset] || "maximum");
       }
       // Campaign filter
       if (reportCampaignId) params.set("campaign_id", reportCampaignId);
@@ -6720,7 +6720,7 @@ export default function Dashboard() {
 
               {/* Date range pills */}
               <div style={{ display: "flex", gap: 4 }}>
-                {(["7d", "15d", "30d", "90d"] as const).map(d => (
+                {(["max", "7d", "15d", "30d", "90d"] as const).map(d => (
                   <button
                     key={d}
                     onClick={() => setReportDatePreset(d)}
@@ -6733,7 +6733,7 @@ export default function Dashboard() {
                       fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
                     }}
                   >
-                    {d === "7d" ? "7 days" : d === "15d" ? "15 days" : d === "30d" ? "30 days" : "90 days"}
+                    {d === "max" ? "All Time" : d === "7d" ? "7 days" : d === "15d" ? "15 days" : d === "30d" ? "30 days" : "90 days"}
                   </button>
                 ))}
               </div>

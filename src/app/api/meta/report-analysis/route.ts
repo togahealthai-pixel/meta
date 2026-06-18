@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const filter     = searchParams.get("filter")      || "both";
     const note       = searchParams.get("note")        || "";
-    const datePreset = searchParams.get("date_preset") || "last_30_d";
+    const datePreset = searchParams.get("date_preset") || "maximum";
     const dateFrom   = searchParams.get("date_from");
     const dateTo     = searchParams.get("date_to");
     const campaignId = searchParams.get("campaign_id") || "";
