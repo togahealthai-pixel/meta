@@ -109,6 +109,9 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
   const scoreC  = (n: number) => n >= 70 ? "#16a34a" : n >= 40 ? "#d97706" : "#dc2626";
   const scoreBG = (n: number) => n >= 70 ? "#f0fdf4" : n >= 40 ? "#fffbeb" : "#fff7f7";
   const scoreBD = (n: number) => n >= 70 ? "#bbf7d0" : n >= 40 ? "#fde68a" : "#fecaca";
+  // jsPDF WinAnsi doesn't support Unicode arrows/checkmarks/em-dashes — use ASCII
+  const safe = (t: string) => t.replace(/→/g,">").replace(/✓/g,"*").replace(/—/g,"-").replace(/…/g,"...").replace(/‘|’/g,"'").replace(/“|”/g,'"');
+  const fmtStatus = (st: string) => st === "ACTIVE" ? "Active" : st === "PAUSED" ? "Paused" : st === "CAMPAIGN_PAUSED" ? "Cam-Paused" : st === "ADSET_PAUSED" ? "Set-Paused" : st;
 
   // HEADER
   doc.setFillColor(...h2r("#1e40af")); doc.rect(mg, y, cw, 26, "F");
@@ -117,7 +120,7 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
   doc.setFontSize(16); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold");
   doc.text("Meta Ads Performance Report", mg+5, y+13);
   doc.setFontSize(7.5); doc.setFont("helvetica","normal"); doc.setTextColor(190,220,255);
-  const sub = `${date}  ·  Filter: ${filterLabel}  ·  Period: ${periodLabel}${note ? `  ·  Note: ${note}` : ""}`;
+  const sub = safe(`${date}  |  Filter: ${filterLabel}  |  Period: ${periodLabel}${note ? `  |  Note: ${note}` : ""}`);
   doc.text(sub, mg+5, y+21);
   y += 31;
 
@@ -137,14 +140,14 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
 
   // AI OVERVIEW
   need(20);
-  const ovLines = doc.splitTextToSize(result.ai_overview || "", cw-10);
-  const recLines = result.overall_recommendation ? doc.splitTextToSize(`→ ${result.overall_recommendation}`, cw-10) : [];
-  const ovH = 10 + ovLines.length*5 + (recLines.length>0 ? recLines.length*5+6 : 0);
+  const ovLines = doc.splitTextToSize(safe(result.ai_overview || ""), cw-14);
+  const recLines = result.overall_recommendation ? doc.splitTextToSize(safe(`>> ${result.overall_recommendation}`), cw-14) : [];
+  const ovH = 12 + ovLines.length*5.2 + (recLines.length>0 ? recLines.length*5+8 : 0);
   doc.setFillColor(239,246,255); doc.rect(mg, y, cw, ovH, "F");
   doc.setFillColor(59,130,246); doc.rect(mg, y, 3, ovH, "F");
   doc.setFontSize(7); doc.setTextColor(59,130,246); doc.setFont("helvetica","bold"); doc.text("AI OVERVIEW", mg+6, y+5.5);
-  doc.setFontSize(9.5); doc.setTextColor(30,41,59); doc.setFont("helvetica","normal"); doc.text(ovLines, mg+6, y+11);
-  if (recLines.length>0) { const ry=y+11+ovLines.length*5+4; doc.setFontSize(9); doc.setTextColor(29,78,216); doc.setFont("helvetica","bold"); doc.text(recLines, mg+6, ry); }
+  doc.setFontSize(9.5); doc.setTextColor(30,41,59); doc.setFont("helvetica","normal"); doc.text(ovLines, mg+6, y+12);
+  if (recLines.length>0) { const ry=y+12+ovLines.length*5.2+5; doc.setFontSize(9); doc.setTextColor(29,78,216); doc.setFont("helvetica","bold"); doc.text(recLines, mg+6, ry); }
   y += ovH + 6;
 
   // KEY INSIGHTS
@@ -152,7 +155,7 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
     need(20);
     doc.setFontSize(12); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold"); doc.text("Key Insights", mg, y+5); y+=9;
     (result.key_insights as string[]).forEach((ins, i) => {
-      const lines = doc.splitTextToSize(ins, cw-18);
+      const lines = doc.splitTextToSize(safe(ins), cw-18);
       const rh = lines.length*4.8+5;
       need(rh);
       doc.setFillColor(59,130,246); doc.circle(mg+4.5, y+3.5, 3.5, "F");
@@ -170,18 +173,18 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
     (result.top_performers as any[]).forEach((ad: any) => {
       const noteObj = (result.top_performer_notes||[]).find((n:any)=>n.ad_id===ad.id);
       const [scR,scG,scB]=h2r(scoreC(ad.score)), [bgR,bgG,bgB]=h2r(scoreBG(ad.score)), [bdR,bdG,bdB]=h2r(scoreBD(ad.score));
-      const nLines = noteObj?.why_performing ? doc.splitTextToSize(`✓ ${noteObj.why_performing}`, cw-10) : [];
-      const ch = 20 + nLines.length*4.5;
+      const nLines = noteObj?.why_performing ? doc.splitTextToSize(safe(`* ${noteObj.why_performing}`), cw-12) : [];
+      const ch = 20 + nLines.length*5;
       need(ch+3);
       doc.setFillColor(bgR,bgG,bgB); doc.rect(mg, y, cw, ch, "F");
       doc.setDrawColor(bdR,bdG,bdB); doc.rect(mg, y, cw, ch, "D");
       doc.setFontSize(10); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold");
-      doc.text(ad.name.length>35?ad.name.slice(0,35)+"…":ad.name, mg+4, y+8);
+      doc.text(ad.name.length>35?ad.name.slice(0,35)+"...":ad.name, mg+4, y+8);
       doc.setFillColor(scR,scG,scB); doc.rect(mg+cw-26, y+3, 23, 7, "F");
       doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.text(`Score: ${ad.score}`, mg+cw-25, y+7.8);
       doc.setFontSize(8); doc.setTextColor(71,85,105); doc.setFont("helvetica","normal");
-      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  CPM: ${ad.cpm>0?"$"+ad.cpm.toFixed(2):"—"}`, mg+4, y+14.5);
-      if (nLines.length>0) { doc.setFontSize(7.5); doc.setTextColor(scR,scG,scB); doc.setFont("helvetica","italic"); doc.text(nLines, mg+4, y+20); }
+      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  CPM: ${ad.cpm>0?"$"+ad.cpm.toFixed(2):"-"}`, mg+4, y+14.5);
+      if (nLines.length>0) { doc.setFontSize(7.5); doc.setTextColor(scR,scG,scB); doc.setFont("helvetica","normal"); doc.text(nLines, mg+4, y+21); }
       y += ch+4;
     });
     y += 2;
@@ -212,15 +215,15 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
       doc.setFillColor(bgR,bgG,bgB); doc.rect(mg, y, cw, hH, "F");
       doc.setDrawColor(bdR,bdG,bdB); doc.rect(mg, y, cw, hH, "D");
       doc.setFontSize(10); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold");
-      doc.text(ad.name.length>35?ad.name.slice(0,35)+"…":ad.name, mg+4, y+7.5);
+      doc.text(ad.name.length>35?ad.name.slice(0,35)+"...":ad.name, mg+4, y+7.5);
       doc.setFillColor(scR,scG,scB); doc.rect(mg+cw-26, y+3, 23, 7, "F");
       doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.text(`Score: ${ad.score}`, mg+cw-25, y+7.8);
       doc.setFontSize(8); doc.setTextColor(71,85,105); doc.setFont("helvetica","normal");
-      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  Status: ${ad.status}`, mg+4, y+14);
+      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  Status: ${fmtStatus(ad.status)}`, mg+4, y+14);
       y += hH;
       fields.forEach(f => {
         const [fcR,fcG,fcB]=h2r(f.color);
-        const flines=doc.splitTextToSize(f.val!, cw-10);
+        const flines=doc.splitTextToSize(safe(f.val!), cw-12);
         const fh=flines.length*4.5+11;
         need(fh);
         doc.setFillColor(255,255,255); doc.setDrawColor(fcR,fcG,fcB); doc.rect(mg, y, cw, fh, "FD");
@@ -253,16 +256,16 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
     const [scR,scG,scB]=h2r(scoreC(ad.score));
     const stC:[number,number,number]=ad.status==="ACTIVE"?[22,163,74]:[100,116,139];
     const row=[
-      {v:ad.name.length>26?ad.name.slice(0,26)+"…":ad.name, c:[15,23,42] as [number,number,number], b:true},
-      {v:(ad.campaign_name||"").length>18?(ad.campaign_name||"").slice(0,18)+"…":(ad.campaign_name||""), c:[100,116,139] as [number,number,number], b:false},
-      {v:ad.status, c:stC, b:false},
+      {v:ad.name.length>26?ad.name.slice(0,26)+"...":ad.name, c:[15,23,42] as [number,number,number], b:true},
+      {v:(ad.campaign_name||"").length>18?(ad.campaign_name||"").slice(0,18)+"...":(ad.campaign_name||""), c:[100,116,139] as [number,number,number], b:false},
+      {v:fmtStatus(ad.status), c:stC, b:false},
       {v:String(ad.score), c:[scR,scG,scB] as [number,number,number], b:true},
       {v:`$${ad.spend.toFixed(2)}`, c:[15,23,42] as [number,number,number], b:false},
       {v:ad.impressions.toLocaleString(), c:[15,23,42] as [number,number,number], b:false},
       {v:String(ad.clicks), c:[15,23,42] as [number,number,number], b:false},
       {v:`${ad.ctr.toFixed(2)}%`, c:[37,99,235] as [number,number,number], b:true},
-      {v:ad.cpc>0?`$${ad.cpc.toFixed(2)}`:"—", c:[15,23,42] as [number,number,number], b:false},
-      {v:ad.cpm>0?`$${ad.cpm.toFixed(2)}`:"—", c:[15,23,42] as [number,number,number], b:false},
+      {v:ad.cpc>0?`$${ad.cpc.toFixed(2)}`:"-", c:[15,23,42] as [number,number,number], b:false},
+      {v:ad.cpm>0?`$${ad.cpm.toFixed(2)}`:"-", c:[15,23,42] as [number,number,number], b:false},
     ];
     cx=mg;
     row.forEach((r,j)=>{ doc.setFontSize(7.5); doc.setTextColor(r.c[0],r.c[1],r.c[2]); doc.setFont("helvetica",r.b?"bold":"normal"); doc.text(r.v, cx+2, y+5.5); cx+=ns[j].w; });
@@ -274,7 +277,7 @@ async function downloadPDF(result: any, filter: string, note: string, datePreset
   for(let p=1;p<=tp;p++){
     doc.setPage(p);
     doc.setFontSize(7.5); doc.setTextColor(148,163,184); doc.setFont("helvetica","normal");
-    doc.text(`Generated by Toga Health AI · ${date}`, pw/2, 292, {align:"center"});
+    doc.text(`Generated by Toga Health AI - ${date}`, pw/2, 292, {align:"center"});
     doc.text(`${p} / ${tp}`, pw-mg, 292, {align:"right"});
   }
   doc.save(`meta-ads-report-${new Date().toISOString().split("T")[0]}.pdf`);

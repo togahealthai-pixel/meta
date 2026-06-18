@@ -438,7 +438,12 @@ Examples of GOOD suggestions:
   ✓ headline_suggestion: "How Much Does Hair Restoration Cost in Canada? (Free Consult)" — rewrites the actual headline using a direct question hook
   ✓ budget_suggestion: "Pause this ad. Move its $12/day to 'Hair Restore V2' which has CTR 1.4%"
   ✓ placement_suggestion: "Remove Stories and Reels — this ad has 0 clicks across 312 impressions; test Feed-only first"
-  ✓ age_gender_suggestion: "Current CTR 0.08% across all genders — restrict to Male 35–55, who are the decision-makers for medical tourism"
+  ✓ age_gender_suggestion: "Current CTR 0.08% across all genders — restrict to Male 35-55, who are the decision-makers for medical tourism"
+
+CRITICAL — headline/body suggestions must be a REWRITE, never a restatement:
+  ✗ BAD: Current headline is "Experience JCI-Accredited Surgical Excellence" → suggestion: "Experience JCI-Accredited Surgical Excellence" (SAME TEXT — this is forbidden)
+  ✓ GOOD: Current headline is "Experience JCI-Accredited Surgical Excellence" → suggestion: "Are You Overpaying for Surgery? JCI-Accredited Clinics in Turkey — Compare Costs" (genuinely new hook)
+  If you cannot write a meaningfully better headline than the current one, output null for headline_suggestion.
 
 ---
 ## RULES PER PATTERN — only fill these fields per pattern
