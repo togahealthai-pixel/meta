@@ -353,26 +353,34 @@ export async function GET(req: NextRequest) {
       }));
       const underSugg = underperformers.map((a) => {
         const noDelivery = a.impressions === 0 && a.spend === 0;
-        const zeroClick = a.ctr === 0 && a.spend > 0 && a.impressions > 0;
+        const zeroClick  = a.ctr === 0 && a.spend > 0 && a.impressions > 0;
+        const lowCtr     = !noDelivery && !zeroClick && a.ctr < 0.3;
+        const pattern    = noDelivery ? "A" : zeroClick ? "B" : lowCtr ? "C" : "D";
         return {
-          ad_id: a.id, ad_name: a.name,
-          pattern: noDelivery ? "A" : zeroClick ? "B" : "C",
+          ad_id: a.id, ad_name: a.name, pattern,
           issue: noDelivery
             ? `Ad has never served ($0 spend, 0 impressions). Campaign is paused or budget is $0. Fix delivery first — creative changes are useless until the ad runs.`
             : zeroClick
-            ? `Spent $${a.spend.toFixed(2)} with ${a.impressions.toLocaleString()} impressions and 0 clicks. The hook is not stopping the scroll.`
-            : `CTR ${a.ctr.toFixed(2)}% with ${a.clicks} clicks — below benchmark. Audience match or body copy needs improvement.`,
-          headline_suggestion: noDelivery ? null : (zeroClick && a.headline ? `Current headline: "${a.headline.slice(0, 80)}" — open with a specific number or question instead.` : null),
-          body_suggestion: noDelivery ? null : (zeroClick && a.body ? `Current: "${a.body.slice(0, 60)}..." — lead with the transformation result, not the service description.` : null),
-          cta_suggestion: noDelivery ? null : (a.cta === "CONTACT_US" ? "Change to LEARN_MORE — lower friction for cold audiences" : null),
-          location_suggestion: noDelivery ? null : "Confirm geo targets Canada only if copy references Canadian pricing.",
-          age_gender_suggestion: noDelivery ? null : null,
-          placement_suggestion: noDelivery ? null : (zeroClick ? "Restrict to Facebook Feed + Instagram Feed only — remove Stories/Reels until CTR improves." : null),
+            ? `Spent $${a.spend.toFixed(2)} with ${a.impressions.toLocaleString()} impressions and 0 clicks. The hook is completely failing to stop the scroll.`
+            : `CTR ${a.ctr.toFixed(2)}% with ${a.clicks} clicks — below the 0.3% benchmark for this industry. Audience relevance or body copy needs improvement.`,
+          // Pattern A: no creative suggestions, only delivery fix
+          headline_suggestion:     (noDelivery || !a.headline) ? null : zeroClick ? `"${a.headline.slice(0, 80)}" is not converting. Rewrite: open with a specific number, question, or bold result in the first 5 words.` : null,
+          body_suggestion:         (noDelivery || !a.body) ? null : zeroClick ? `"${a.body.slice(0, 80)}..." — lead with the patient outcome, not the service description.` : null,
+          cta_suggestion:          (noDelivery || zeroClick) ? null : (a.cta === "CONTACT_US" ? "Switch to LEARN_MORE — lower commitment ask for cold audiences." : null),
+          location_suggestion:     null,
+          age_gender_suggestion:   null,
+          placement_suggestion:    (!noDelivery && zeroClick && a.impressions > 300) ? `${a.impressions.toLocaleString()} impressions, 0 clicks — restrict to Facebook Feed + Instagram Feed only. Remove Stories/Reels until CTR improves.` : null,
           bid_strategy_suggestion: null,
-          targeting_suggestion: noDelivery ? "Once active: use Advantage+ audience, Feed placement, $5/day minimum." : (!zeroClick ? "Switch to 1% lookalike of website visitors or video viewers." : null),
+          targeting_suggestion:    noDelivery
+            ? "Once active: use Advantage+ audience, Feed placement only, $5/day minimum to gather data."
+            : lowCtr
+            ? `CTR ${a.ctr.toFixed(2)}% suggests audience mismatch — switch to 1% lookalike of website visitors or video viewers instead of broad interest targeting.`
+            : null,
           budget_suggestion: noDelivery
-            ? "Set minimum $5/day and activate the campaign. Evaluate creative after 500 impressions."
-            : `Pause. Redirect budget to "${topPerformers[0]?.name || "top performer"}" while fixing the hook.`,
+            ? "Set minimum $5/day budget and activate the campaign. Re-evaluate creative after 500 impressions."
+            : topPerformers.length > 0
+            ? `Pause this ad. Redirect its daily budget to "${topPerformers[0].name}" which is already performing — fix the hook here first, then reactivate at $5/day.`
+            : "Pause until hook is rewritten. Reactivate at $5/day after copy update.",
           url_suggestion: null,
         };
       });
@@ -392,7 +400,7 @@ export async function GET(req: NextRequest) {
 
 Analyse this Meta Ads account (medical tourism / healthcare brand).
 Ads have been scored by a deterministic formula. DO NOT change scores or classifications.
-Write analysis text and suggestions only.
+Write analysis text and targeted suggestions only.
 
 Filter: ${filter} | Period: ${datePreset} | Analyst note: ${note || "none"}
 Account totals: spend=$${totalSpend.toFixed(2)} | impressions=${totalImpressions.toLocaleString()} | clicks=${totalClicks} | avg_ctr=${avgCtr.toFixed(4)}% | avg_cpm=$${avgCpm.toFixed(2)}
@@ -401,36 +409,59 @@ ADS DATA:
 ${JSON.stringify(gptData, null, 2)}
 
 ---
-## RULES PER SUGGESTION FIELD
+## SUGGESTION QUALITY RULE — READ THIS FIRST
 
-For each underperformer, use ONLY the fields relevant to its diagnosis pattern:
+A suggestion field must be null UNLESS you can write a concrete, specific action that directly addresses this ad's root cause.
+
+FEWER GOOD SUGGESTIONS > MANY GENERIC ONES.
+
+A suggestion is GOOD if: it references a real number, real headline/body text, or a specific action tied to the diagnosis.
+A suggestion is BAD (→ null) if: it could apply to any ad, it contains [brackets], it restates the problem without a fix, or it's generic advice.
+
+Examples of BAD suggestions (always output null instead):
+  ✗ "Confirm geo targets match your copy" — generic, applies to any ad
+  ✗ "Consider optimising your headline" — generic
+  ✗ "Test different audiences" — no specifics
+  ✗ "Increase budget to improve delivery" — no concrete $ amount
+  ✗ Any sentence with [placeholder] text
+
+Examples of GOOD suggestions:
+  ✓ headline_suggestion: "How Much Does Hair Restoration Cost in Canada? (Free Consult)" — rewrites the actual headline using a direct question hook
+  ✓ budget_suggestion: "Pause this ad. Move its $12/day to 'Hair Restore V2' which has CTR 1.4%"
+  ✓ placement_suggestion: "Remove Stories and Reels — this ad has 0 clicks across 312 impressions; test Feed-only first"
+  ✓ age_gender_suggestion: "Current CTR 0.08% across all genders — restrict to Male 35–55, who are the decision-makers for medical tourism"
+
+---
+## RULES PER PATTERN — only fill these fields per pattern
 
 PATTERN A (spend=0, impressions=0 — never served):
-  → issue, targeting_suggestion, budget_suggestion ONLY
-  → headline/body/cta/location/placement/bid_strategy/url = null
-  → DO NOT suggest creative changes for an ad that has never run
+  → FILL: issue, budget_suggestion (exact minimum $ to activate), targeting_suggestion (what to fix first)
+  → NULL: headline/body/cta/location/age_gender/placement/bid_strategy/url — creative is irrelevant until the ad runs
 
-PATTERN B (impressions>0, clicks=0, CTR=0% — hook failing):
-  → issue, headline_suggestion, body_suggestion, placement_suggestion, budget_suggestion
-  → ONLY rewrite headline/body if has_creative_data=true (real data exists)
-  → If has_creative_data=false: headline_suggestion=null, body_suggestion=null
-  → Check for creative mismatch: if body mentions a different procedure than headline, flag as CRITICAL MISMATCH
+PATTERN B (impressions>0, clicks=0, CTR=0% — hook completely failing):
+  → FILL: issue, headline_suggestion (only if has_creative_data=true), body_suggestion (only if has_creative_data=true), placement_suggestion (if hook fix needs a more forgiving placement)
+  → If has_creative_data=false → headline_suggestion=null, body_suggestion=null
+  → NULL: location/age_gender/bid_strategy/url (audience is not the problem when CTR=0)
+  → MISMATCH CHECK: if body mentions a different procedure than headline → lead issue with "CRITICAL MISMATCH:"
 
-PATTERN C (clicks>0, CTR<0.3% — audience/relevance problem):
-  → issue, location_suggestion, age_gender_suggestion, targeting_suggestion, cta_suggestion
-  → headline/body = null (creative is partially working)
+PATTERN C (clicks>0, CTR<0.3% — audience or relevance problem):
+  → FILL: issue, location_suggestion (only if geo is clearly wrong for this offer), age_gender_suggestion (only if demographics clearly misaligned), targeting_suggestion (specific audience refinement)
+  → NULL: headline/body (creative is partially working), bid_strategy (not the root problem)
 
 PATTERN D (CTR>0.5%, impressions<500 — delivery starved):
-  → issue, budget_suggestion, targeting_suggestion only
+  → FILL: issue, budget_suggestion (concrete $), targeting_suggestion (broaden audience)
+  → NULL: everything else — this is a delivery problem, not a creative or audience problem
 
-PATTERN E (decent CTR, high CPC):
-  → issue, cta_suggestion, bid_strategy_suggestion, targeting_suggestion
+PATTERN E (decent CTR, high CPC vs account average):
+  → FILL: issue, cta_suggestion (specific button change), bid_strategy_suggestion (specific cap), targeting_suggestion (warmer audience)
+  → NULL: headline/body/location/placement
 
-ANTI-HALLUCINATION — ABSOLUTE RULES:
-1. If headline=null AND body=null → all creative fields (headline_suggestion, body_suggestion) = null. PERIOD.
-2. DO NOT read the ad name and invent what the headline/body might say.
-3. DO NOT output bracket placeholders like [amount] or [procedure] as final suggestions — output null instead.
-4. Every metric you reference must come from the metrics object. No rounding up.
+---
+## ANTI-HALLUCINATION — ABSOLUTE RULES
+1. headline=null AND body=null → headline_suggestion=null, body_suggestion=null. No exceptions.
+2. Never invent procedures, prices, clinic names, or stats from the ad name.
+3. Never output [bracket] templates as suggestions — null instead.
+4. Every number must come from the metrics object exactly as given.
 
 ---
 ## REQUIRED JSON
@@ -454,16 +485,16 @@ ANTI-HALLUCINATION — ABSOLUTE RULES:
       "ad_id": "<id>",
       "ad_name": "<name>",
       "pattern": "A|B|C|D|E",
-      "issue": "Root cause with actual numbers from metrics",
-      "headline_suggestion": "<rewrite using real headline data OR null>",
-      "body_suggestion": "<rewrite using real body data OR null>",
+      "issue": "Root cause in one sentence with actual numbers",
+      "headline_suggestion": "<specific rewrite from real headline OR null>",
+      "body_suggestion": "<specific rewrite from real body OR null>",
       "cta_suggestion": "<LEARN_MORE|GET_QUOTE|BOOK_TRAVEL|CONTACT_US|SIGN_UP|WATCH_MORE OR null>",
-      "location_suggestion": "<specific geo action OR null>",
-      "age_gender_suggestion": "<specific demographic action OR null>",
-      "placement_suggestion": "<specific placement action OR null>",
+      "location_suggestion": "<specific geo action tied to this ad's data OR null>",
+      "age_gender_suggestion": "<specific demographic action tied to this ad's data OR null>",
+      "placement_suggestion": "<specific placement action tied to this ad's data OR null>",
       "bid_strategy_suggestion": "<specific bid action OR null>",
-      "targeting_suggestion": "<audience action OR null>",
-      "budget_suggestion": "<concrete $ action OR null>",
+      "targeting_suggestion": "<specific audience action OR null>",
+      "budget_suggestion": "<concrete $-amount action OR null>",
       "url_suggestion": "<UTM or URL fix OR null>"
     }
   ],
@@ -473,8 +504,8 @@ ANTI-HALLUCINATION — ABSOLUTE RULES:
 HARD RULES:
 - top_performer_notes: exactly ${topPerformers.length} entries
 - underperformer_suggestions: exactly ${underperformers.length} entries
-- null fields are correct — only fill if it directly addresses the pattern's root cause
-- never invent data not present in the ads data above`;
+- Prefer null over generic advice — only fill a field when you have a specific, data-driven reason
+- Never invent data not present in the ads data above`;
 
     let ai: Record<string, unknown> = {};
     let aiError = "";
