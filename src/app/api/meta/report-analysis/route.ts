@@ -158,9 +158,18 @@ Good: "5 Canadians cut surgery cost by 70% — here's how" | "Are you overpaying
 Bad: "We offer..." / "Our clinic provides..." — loses 90% of viewers immediately.
 
 ### Creative Mismatch Detection
-If the body copy mentions a procedure (e.g. belly fat, liposuction) that does not match the headline
-(e.g. hair restoration, rhinoplasty), flag this as CRITICAL MISMATCH — it kills relevance score.
-This is the first thing to fix.
+A CRITICAL MISMATCH exists ONLY when the headline's primary topic/procedure is DIFFERENT from the body's primary topic/procedure.
+
+MISMATCH examples (flag these):
+  ✗ Headline: "Save Thousands — All-Inclusive Price" + Body: about belly fat surgery → different topics
+  ✗ Headline: "Hair Restoration in Turkey" + Body: about dental implants → different procedures
+
+NOT a mismatch (do NOT flag):
+  ✓ Headline: "Restore Hair in Turkey" + Body: about hair restoration → SAME topic, aligned
+  ✓ Headline about pricing/savings + Body also about pricing/savings → SAME topic
+  ✓ Headline mentions a procedure + Body expands on that same procedure → aligned
+
+Rule: if you are unsure whether it's a mismatch, do NOT flag it. Only flag when certain the topics are different.
 
 ### ABSOLUTE ANTI-HALLUCINATION RULES
 1. NEVER invent: procedures, prices, countries, clinic names, statistics, or patient stories
@@ -537,6 +546,17 @@ HARD RULES:
         ...(ai.underperformer_suggestions as unknown[] || []),
         ...missedUnder.map((a) => fbMap.get(a.id)).filter(Boolean),
       ];
+    }
+
+    // Hard enforcement: null creative fields when no creative data exists (GPT sometimes ignores this)
+    const noCreativeIds = new Set(gptData.filter((a) => !a.has_creative_data).map((a) => a.id));
+    if (noCreativeIds.size > 0) {
+      ai.underperformer_suggestions = (ai.underperformer_suggestions as any[] || []).map((s: any) => {
+        if (noCreativeIds.has(s.ad_id)) {
+          return { ...s, headline_suggestion: null, body_suggestion: null };
+        }
+        return s;
+      });
     }
 
     return NextResponse.json({

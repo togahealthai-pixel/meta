@@ -92,8 +92,196 @@ const LOCATION_SUGGESTIONS = [
   { name: "Italy", shortcut: "IT", details: "Country in Europe" },
 ];
 
+// ─── DIRECT PDF DOWNLOAD (jsPDF — no print dialog) ───────────
+async function downloadPDF(result: any, filter: string, note: string, datePreset: string): Promise<void> {
+  const { default: jsPDF } = await import("jspdf");
+  const date = new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const filterLabel = filter === "both" ? "All Ads" : filter === "live" ? "Live Ads" : "Paused Ads";
+  const periodMap: Record<string, string> = { max: "All Time", "7d": "Last 7 Days", "15d": "Last 15 Days", "30d": "Last 30 Days", "90d": "Last 90 Days" };
+  const periodLabel = periodMap[datePreset] || "All Time";
+  const s = result.summary;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = 210, mg = 13, cw = pw - 2 * mg;
+  let y = mg;
+  const newPage = () => { doc.addPage(); y = mg; };
+  const need = (h: number) => { if (y + h > 282) newPage(); };
+  const h2r = (hex: string): [number, number, number] => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+  const scoreC  = (n: number) => n >= 70 ? "#16a34a" : n >= 40 ? "#d97706" : "#dc2626";
+  const scoreBG = (n: number) => n >= 70 ? "#f0fdf4" : n >= 40 ? "#fffbeb" : "#fff7f7";
+  const scoreBD = (n: number) => n >= 70 ? "#bbf7d0" : n >= 40 ? "#fde68a" : "#fecaca";
+
+  // HEADER
+  doc.setFillColor(...h2r("#1e40af")); doc.rect(mg, y, cw, 26, "F");
+  doc.setFontSize(7); doc.setTextColor(160,200,255); doc.setFont("helvetica","bold");
+  doc.text("TOGA HEALTH AI", mg+5, y+5.5);
+  doc.setFontSize(16); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold");
+  doc.text("Meta Ads Performance Report", mg+5, y+13);
+  doc.setFontSize(7.5); doc.setFont("helvetica","normal"); doc.setTextColor(190,220,255);
+  const sub = `${date}  ·  Filter: ${filterLabel}  ·  Period: ${periodLabel}${note ? `  ·  Note: ${note}` : ""}`;
+  doc.text(sub, mg+5, y+21);
+  y += 31;
+
+  // KPIs
+  const kpis: [string,string][] = [["Total Ads",String(s.total_ads)],["Total Spend",`$${s.total_spend.toFixed(2)}`],["Impressions",s.total_impressions.toLocaleString()],["Clicks",String(s.total_clicks)],["Avg CTR",`${s.avg_ctr.toFixed(2)}%`],["Avg CPM",`$${s.avg_cpm.toFixed(2)}`],["Avg CPC",`$${s.avg_cpc.toFixed(2)}`]];
+  const kw = cw / kpis.length;
+  kpis.forEach(([label, val], i) => {
+    const x = mg + i * kw;
+    doc.setFillColor(248,250,252); doc.rect(x, y, kw-1.5, 17, "F");
+    doc.setDrawColor(226,232,240); doc.rect(x, y, kw-1.5, 17, "D");
+    doc.setFontSize(6); doc.setTextColor(100,116,139); doc.setFont("helvetica","bold");
+    doc.text(label.toUpperCase(), x+3, y+5);
+    doc.setFontSize(10); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold");
+    doc.text(val, x+3, y+12.5);
+  });
+  y += 22;
+
+  // AI OVERVIEW
+  need(20);
+  const ovLines = doc.splitTextToSize(result.ai_overview || "", cw-10);
+  const recLines = result.overall_recommendation ? doc.splitTextToSize(`→ ${result.overall_recommendation}`, cw-10) : [];
+  const ovH = 10 + ovLines.length*5 + (recLines.length>0 ? recLines.length*5+6 : 0);
+  doc.setFillColor(239,246,255); doc.rect(mg, y, cw, ovH, "F");
+  doc.setFillColor(59,130,246); doc.rect(mg, y, 3, ovH, "F");
+  doc.setFontSize(7); doc.setTextColor(59,130,246); doc.setFont("helvetica","bold"); doc.text("AI OVERVIEW", mg+6, y+5.5);
+  doc.setFontSize(9.5); doc.setTextColor(30,41,59); doc.setFont("helvetica","normal"); doc.text(ovLines, mg+6, y+11);
+  if (recLines.length>0) { const ry=y+11+ovLines.length*5+4; doc.setFontSize(9); doc.setTextColor(29,78,216); doc.setFont("helvetica","bold"); doc.text(recLines, mg+6, ry); }
+  y += ovH + 6;
+
+  // KEY INSIGHTS
+  if ((result.key_insights||[]).length>0) {
+    need(20);
+    doc.setFontSize(12); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold"); doc.text("Key Insights", mg, y+5); y+=9;
+    (result.key_insights as string[]).forEach((ins, i) => {
+      const lines = doc.splitTextToSize(ins, cw-18);
+      const rh = lines.length*4.8+5;
+      need(rh);
+      doc.setFillColor(59,130,246); doc.circle(mg+4.5, y+3.5, 3.5, "F");
+      doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.text(String(i+1), mg+4.5, y+5, {align:"center"});
+      doc.setFontSize(9); doc.setTextColor(30,41,59); doc.setFont("helvetica","normal"); doc.text(lines, mg+11, y+4.5);
+      y += rh;
+    });
+    y += 4;
+  }
+
+  // TOP PERFORMERS
+  if ((result.top_performers||[]).length>0) {
+    need(18);
+    doc.setFontSize(12); doc.setTextColor(21,128,61); doc.setFont("helvetica","bold"); doc.text("Top Performers", mg, y+5); y+=9;
+    (result.top_performers as any[]).forEach((ad: any) => {
+      const noteObj = (result.top_performer_notes||[]).find((n:any)=>n.ad_id===ad.id);
+      const [scR,scG,scB]=h2r(scoreC(ad.score)), [bgR,bgG,bgB]=h2r(scoreBG(ad.score)), [bdR,bdG,bdB]=h2r(scoreBD(ad.score));
+      const nLines = noteObj?.why_performing ? doc.splitTextToSize(`✓ ${noteObj.why_performing}`, cw-10) : [];
+      const ch = 20 + nLines.length*4.5;
+      need(ch+3);
+      doc.setFillColor(bgR,bgG,bgB); doc.rect(mg, y, cw, ch, "F");
+      doc.setDrawColor(bdR,bdG,bdB); doc.rect(mg, y, cw, ch, "D");
+      doc.setFontSize(10); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold");
+      doc.text(ad.name.length>35?ad.name.slice(0,35)+"…":ad.name, mg+4, y+8);
+      doc.setFillColor(scR,scG,scB); doc.rect(mg+cw-26, y+3, 23, 7, "F");
+      doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.text(`Score: ${ad.score}`, mg+cw-25, y+7.8);
+      doc.setFontSize(8); doc.setTextColor(71,85,105); doc.setFont("helvetica","normal");
+      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  CPM: ${ad.cpm>0?"$"+ad.cpm.toFixed(2):"—"}`, mg+4, y+14.5);
+      if (nLines.length>0) { doc.setFontSize(7.5); doc.setTextColor(scR,scG,scB); doc.setFont("helvetica","italic"); doc.text(nLines, mg+4, y+20); }
+      y += ch+4;
+    });
+    y += 2;
+  }
+
+  // NEEDS IMPROVEMENT
+  if ((result.underperformers||[]).length>0) {
+    need(18);
+    doc.setFontSize(12); doc.setTextColor(180,83,9); doc.setFont("helvetica","bold"); doc.text("Needs Improvement", mg, y+5); y+=9;
+    (result.underperformers as any[]).forEach((ad:any) => {
+      const sugg=(result.underperformer_suggestions||[]).find((s:any)=>s.ad_id===ad.id);
+      const [scR,scG,scB]=h2r(scoreC(ad.score)), [bgR,bgG,bgB]=h2r(scoreBG(ad.score)), [bdR,bdG,bdB]=h2r(scoreBD(ad.score));
+      const fields = sugg ? [
+        {label:"ROOT ISSUE",     level:"",         val:sugg.issue,                   color:"#dc2626"},
+        {label:"NEW HEADLINE",   level:"Ad",       val:sugg.headline_suggestion,     color:"#2563eb"},
+        {label:"NEW AD TEXT",    level:"Ad",       val:sugg.body_suggestion,         color:"#2563eb"},
+        {label:"CTA BUTTON",     level:"Ad",       val:sugg.cta_suggestion,          color:"#7c3aed"},
+        {label:"URL/TRACKING",   level:"Ad",       val:sugg.url_suggestion,          color:"#7c3aed"},
+        {label:"LOCATION",       level:"Ad Set",   val:sugg.location_suggestion,     color:"#0891b2"},
+        {label:"AGE & GENDER",   level:"Ad Set",   val:sugg.age_gender_suggestion,   color:"#0891b2"},
+        {label:"PLACEMENT",      level:"Ad Set",   val:sugg.placement_suggestion,    color:"#0891b2"},
+        {label:"AUDIENCE",       level:"Ad Set",   val:sugg.targeting_suggestion,    color:"#0891b2"},
+        {label:"BID STRATEGY",   level:"Ad Set",   val:sugg.bid_strategy_suggestion, color:"#d97706"},
+        {label:"BUDGET",         level:"Campaign", val:sugg.budget_suggestion,       color:"#d97706"},
+      ].filter(f=>f.val) : [];
+      const hH = 19;
+      need(hH+3);
+      doc.setFillColor(bgR,bgG,bgB); doc.rect(mg, y, cw, hH, "F");
+      doc.setDrawColor(bdR,bdG,bdB); doc.rect(mg, y, cw, hH, "D");
+      doc.setFontSize(10); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold");
+      doc.text(ad.name.length>35?ad.name.slice(0,35)+"…":ad.name, mg+4, y+7.5);
+      doc.setFillColor(scR,scG,scB); doc.rect(mg+cw-26, y+3, 23, 7, "F");
+      doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.text(`Score: ${ad.score}`, mg+cw-25, y+7.8);
+      doc.setFontSize(8); doc.setTextColor(71,85,105); doc.setFont("helvetica","normal");
+      doc.text(`CTR: ${ad.ctr.toFixed(2)}%  |  Spend: $${ad.spend.toFixed(2)}  |  Clicks: ${ad.clicks}  |  Status: ${ad.status}`, mg+4, y+14);
+      y += hH;
+      fields.forEach(f => {
+        const [fcR,fcG,fcB]=h2r(f.color);
+        const flines=doc.splitTextToSize(f.val!, cw-10);
+        const fh=flines.length*4.5+11;
+        need(fh);
+        doc.setFillColor(255,255,255); doc.setDrawColor(fcR,fcG,fcB); doc.rect(mg, y, cw, fh, "FD");
+        doc.setFontSize(6.5); doc.setTextColor(fcR,fcG,fcB); doc.setFont("helvetica","bold");
+        doc.text(f.level?`${f.label}   [${f.level}]`:f.label, mg+4, y+5);
+        doc.setFontSize(8.5); doc.setTextColor(15,23,42); doc.setFont("helvetica","normal"); doc.text(flines, mg+4, y+9.5);
+        y += fh;
+      });
+      y += 6;
+    });
+  }
+
+  // ALL ADS TABLE
+  need(22);
+  doc.setFontSize(12); doc.setTextColor(15,23,42); doc.setFont("helvetica","bold"); doc.text("All Ads Performance", mg, y+5); y+=9;
+  const cols=[{h:"Ad Name",w:48},{h:"Campaign",w:30},{h:"Status",w:22},{h:"Score",w:13},{h:"Spend",w:18},{h:"Impr.",w:18},{h:"Clicks",w:13},{h:"CTR",w:14},{h:"CPC",w:12},{h:"CPM",w:12}];
+  const tw=cols.reduce((a,c)=>a+c.w,0);
+  const ns=cols.map(c=>({...c, w:c.w*cw/tw}));
+  need(9);
+  doc.setFillColor(248,250,252); doc.rect(mg, y, cw, 8, "F");
+  doc.setDrawColor(226,232,240); doc.rect(mg, y, cw, 8, "D");
+  let cx=mg;
+  ns.forEach(c=>{ doc.setFontSize(6); doc.setTextColor(100,116,139); doc.setFont("helvetica","bold"); doc.text(c.h.toUpperCase(), cx+2, y+5.5); cx+=c.w; });
+  y+=8;
+  (result.all_ads||[]).forEach((ad:any, i:number)=>{
+    need(8);
+    const rb=i%2===0?[255,255,255]:[248,250,252];
+    doc.setFillColor(rb[0],rb[1],rb[2]); doc.rect(mg, y, cw, 8, "F");
+    doc.setDrawColor(241,245,249); doc.line(mg, y+8, mg+cw, y+8);
+    const [scR,scG,scB]=h2r(scoreC(ad.score));
+    const stC:[number,number,number]=ad.status==="ACTIVE"?[22,163,74]:[100,116,139];
+    const row=[
+      {v:ad.name.length>26?ad.name.slice(0,26)+"…":ad.name, c:[15,23,42] as [number,number,number], b:true},
+      {v:(ad.campaign_name||"").length>18?(ad.campaign_name||"").slice(0,18)+"…":(ad.campaign_name||""), c:[100,116,139] as [number,number,number], b:false},
+      {v:ad.status, c:stC, b:false},
+      {v:String(ad.score), c:[scR,scG,scB] as [number,number,number], b:true},
+      {v:`$${ad.spend.toFixed(2)}`, c:[15,23,42] as [number,number,number], b:false},
+      {v:ad.impressions.toLocaleString(), c:[15,23,42] as [number,number,number], b:false},
+      {v:String(ad.clicks), c:[15,23,42] as [number,number,number], b:false},
+      {v:`${ad.ctr.toFixed(2)}%`, c:[37,99,235] as [number,number,number], b:true},
+      {v:ad.cpc>0?`$${ad.cpc.toFixed(2)}`:"—", c:[15,23,42] as [number,number,number], b:false},
+      {v:ad.cpm>0?`$${ad.cpm.toFixed(2)}`:"—", c:[15,23,42] as [number,number,number], b:false},
+    ];
+    cx=mg;
+    row.forEach((r,j)=>{ doc.setFontSize(7.5); doc.setTextColor(r.c[0],r.c[1],r.c[2]); doc.setFont("helvetica",r.b?"bold":"normal"); doc.text(r.v, cx+2, y+5.5); cx+=ns[j].w; });
+    y+=8;
+  });
+
+  // FOOTER
+  const tp=doc.getNumberOfPages();
+  for(let p=1;p<=tp;p++){
+    doc.setPage(p);
+    doc.setFontSize(7.5); doc.setTextColor(148,163,184); doc.setFont("helvetica","normal");
+    doc.text(`Generated by Toga Health AI · ${date}`, pw/2, 292, {align:"center"});
+    doc.text(`${p} / ${tp}`, pw-mg, 292, {align:"right"});
+  }
+  doc.save(`meta-ads-report-${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
 // ─── REPORT HTML GENERATOR ───────────────────────────────────
-function generateReportHTML(result: any, filter: string, note: string): string {
+function generateReportHTML(result: any, filter: string, note: string, datePreset: string): string {
   const date = new Date().toLocaleString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const s = result.summary;
 
@@ -215,7 +403,7 @@ function generateReportHTML(result: any, filter: string, note: string): string {
   <div style="background:linear-gradient(135deg,#1e40af,#0ea5e9);border-radius:16px;padding:28px 32px;margin-bottom:24px;color:#fff;">
     <div style="font-size:12px;font-weight:600;opacity:.75;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Toga Health AI</div>
     <div style="font-size:26px;font-weight:800;margin-bottom:4px;">Meta Ads Performance Report</div>
-    <div style="font-size:13px;opacity:.8;">${date} &nbsp;·&nbsp; Filter: ${filter === "both" ? "All Ads" : filter === "live" ? "Live Ads" : "Paused Ads"} &nbsp;·&nbsp; Period: Last 30 Days${note ? ` &nbsp;·&nbsp; Note: ${note}` : ""}</div>
+    <div style="font-size:13px;opacity:.8;">${date} &nbsp;·&nbsp; Filter: ${filter === "both" ? "All Ads" : filter === "live" ? "Live Ads" : "Paused Ads"} &nbsp;·&nbsp; Period: ${({ max: "All Time", "7d": "Last 7 Days", "15d": "Last 15 Days", "30d": "Last 30 Days", "90d": "Last 90 Days" } as Record<string,string>)[datePreset] || "All Time"}${note ? ` &nbsp;·&nbsp; Note: ${note}` : ""}</div>
   </div>
 
   <!-- KPIs -->
@@ -6437,21 +6625,7 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button
-                    onClick={() => {
-                      const html = generateReportHTML(reportResult, reportFilter, reportNote);
-                      const iframe = document.createElement('iframe');
-                      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';
-                      document.body.appendChild(iframe);
-                      const doc = iframe.contentDocument || (iframe.contentWindow as any)?.document;
-                      if (!doc) return;
-                      doc.open(); doc.write(html); doc.close();
-                      const cleanup = () => { try { document.body.removeChild(iframe); } catch { /**/ } };
-                      setTimeout(() => {
-                        try { (iframe.contentWindow as any).focus(); (iframe.contentWindow as any).print(); }
-                        catch { /**/ }
-                        setTimeout(cleanup, 2000);
-                      }, 500);
-                    }}
+                    onClick={() => downloadPDF(reportResult, reportFilter, reportNote, reportDatePreset)}
                     style={{
                       padding: '9px 22px', borderRadius: 'var(--radius-md)', border: 'none',
                       background: 'var(--primary)', color: '#fff', fontSize: 13, fontWeight: 700,
