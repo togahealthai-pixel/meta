@@ -6521,29 +6521,32 @@ export default function Dashboard() {
               )}
 
               {/* ── Top Performers ── */}
-              {(reportResult.top_performers || []).length > 0 && (
+              {(reportResult.top_performers || []).length > 0 ? (
                 <Card style={{ padding: '20px 24px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 14, color: '#16a34a' }}>🏆 Top Performers</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 14, color: '#15803d' }}>🏆 Top Performers</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {(reportResult.top_performers as any[]).map((ad: any) => {
                       const note_obj = (reportResult.top_performer_notes || []).find((n: any) => n.ad_id === ad.id);
+                      const sc = ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626';
+                      const sbg = ad.score >= 70 ? '#f0fdf4' : ad.score >= 40 ? '#fffbeb' : '#fff7f7';
+                      const sborder = ad.score >= 70 ? '#bbf7d0' : ad.score >= 40 ? '#fde68a' : '#fecaca';
                       return (
-                        <div key={ad.id} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px' }}>
+                        <div key={ad.id} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: sbg, border: `1px solid ${sborder}`, borderRadius: 12, padding: '14px 16px' }}>
                           {ad.media_url ? (
                             <img src={ad.media_url} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
                           ) : (
-                            <div style={{ width: 52, height: 52, borderRadius: 8, background: '#dcfce7', flexShrink: 0 }} />
+                            <div style={{ width: 52, height: 52, borderRadius: 8, background: sborder, flexShrink: 0 }} />
                           )}
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                               <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
-                              <span style={{ background: ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                              <span style={{ background: sc, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
                               CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; CPM: <b>{ad.cpm > 0 ? `$${ad.cpm.toFixed(2)}` : '—'}</b>
                             </div>
                             {note_obj?.why_performing && (
-                              <div style={{ fontSize: 13, color: '#16a34a', fontStyle: 'italic' }}>✓ {note_obj.why_performing}</div>
+                              <div style={{ fontSize: 13, color: sc, fontStyle: 'italic' }}>✓ {note_obj.why_performing}</div>
                             )}
                           </div>
                         </div>
@@ -6551,29 +6554,38 @@ export default function Dashboard() {
                     })}
                   </div>
                 </Card>
+              ) : (reportResult.all_ads || []).length > 0 && (
+                <Card style={{ padding: '20px 24px', border: '1px solid #fde68a', background: '#fffbeb' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#d97706' }}>⚠ No Strong Performers Yet</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>None of the ads have reached a score of 40. Apply the improvement suggestions below, then re-analyse after 2–3 days of delivery.</div>
+                </Card>
               )}
 
               {/* ── Underperformers + Suggestions ── */}
               {(reportResult.underperformers || []).length > 0 && (
                 <Card style={{ padding: '20px 24px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#dc2626' }}>⚠ Needs Improvement — Targeted Changes Only</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Only the changes that will actually move results for each specific ad — based on its problem pattern</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#b45309' }}>⚠ Needs Improvement — Targeted Changes Only</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Only the changes that will actually move results — based on each ad's problem pattern</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {(reportResult.underperformers as any[]).map((ad: any) => {
                       const sugg = (reportResult.underperformer_suggestions || []).find((s: any) => s.ad_id === ad.id);
+                      const sc = ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626';
+                      const sbg = ad.score >= 70 ? '#f0fdf4' : ad.score >= 40 ? '#fffbeb' : '#fff7f7';
+                      const sborder = ad.score >= 70 ? '#bbf7d0' : ad.score >= 40 ? '#fde68a' : '#fecaca';
+                      const imgBorder = ad.score >= 70 ? '#86efac' : ad.score >= 40 ? '#fbbf24' : '#fca5a5';
+                      const imgBg = ad.score >= 70 ? '#dcfce7' : ad.score >= 40 ? '#fef3c7' : '#fee2e2';
                       return (
-                        <div key={ad.id} style={{ background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: '16px 18px' }}>
-                          {/* Ad header */}
+                        <div key={ad.id} style={{ background: sbg, border: `1px solid ${sborder}`, borderRadius: 14, padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: sugg ? 14 : 0 }}>
                             {ad.media_url ? (
-                              <img src={ad.media_url} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #fca5a5', flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
+                              <img src={ad.media_url} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: `1px solid ${imgBorder}`, flexShrink: 0 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} alt="" />
                             ) : (
-                              <div style={{ width: 52, height: 52, borderRadius: 8, background: '#fee2e2', flexShrink: 0 }} />
+                              <div style={{ width: 52, height: 52, borderRadius: 8, background: imgBg, flexShrink: 0 }} />
                             )}
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, flexWrap: 'wrap', gap: 6 }}>
                                 <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{ad.name}</span>
-                                <span style={{ background: ad.score >= 70 ? '#16a34a' : ad.score >= 40 ? '#d97706' : '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
+                                <span style={{ background: sc, color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>Score: {ad.score}</span>
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                                 CTR: <b>{ad.ctr.toFixed(2)}%</b> &nbsp;|&nbsp; Spend: <b>${ad.spend.toFixed(2)}</b> &nbsp;|&nbsp; Clicks: <b>{ad.clicks}</b> &nbsp;|&nbsp; Status: <b>{ad.status}</b>
@@ -6581,25 +6593,32 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {/* Suggestion tiles */}
                           {sugg ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {([
-                                { label: 'Root Issue', val: sugg.issue, color: '#dc2626', bg: '#fff1f2' },
-                                { label: 'New Headline', val: sugg.headline_suggestion, color: '#2563eb', bg: '#eff6ff' },
-                                { label: 'New Ad Text', val: sugg.body_suggestion, color: '#2563eb', bg: '#eff6ff' },
-                                { label: 'Best CTA', val: sugg.cta_suggestion, color: '#7c3aed', bg: '#f5f3ff' },
-                                { label: 'Targeting Change', val: sugg.targeting_suggestion, color: '#0891b2', bg: '#ecfeff' },
-                                { label: 'Budget Action', val: sugg.budget_suggestion, color: '#d97706', bg: '#fffbeb' },
-                              ] as { label: string; val: string | null; color: string; bg: string }[]).filter(f => f.val).map(f => (
-                                <div key={f.label} style={{ background: f.bg, border: `1px solid ${f.color}25`, borderRadius: 10, padding: '10px 14px' }}>
-                                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: f.color, marginBottom: 4 }}>{f.label}</div>
+                                { label: 'Root Issue',        level: '',         val: sugg.issue,                  color: '#dc2626', bg: '#fff1f2' },
+                                { label: 'New Headline',      level: 'Ad',       val: sugg.headline_suggestion,    color: '#2563eb', bg: '#eff6ff' },
+                                { label: 'New Ad Text',       level: 'Ad',       val: sugg.body_suggestion,        color: '#2563eb', bg: '#eff6ff' },
+                                { label: 'CTA Button',        level: 'Ad',       val: sugg.cta_suggestion,         color: '#7c3aed', bg: '#f5f3ff' },
+                                { label: 'URL / Tracking',    level: 'Ad',       val: sugg.url_suggestion,         color: '#7c3aed', bg: '#f5f3ff' },
+                                { label: 'Location',          level: 'Ad Set',   val: sugg.location_suggestion,    color: '#0891b2', bg: '#ecfeff' },
+                                { label: 'Age & Gender',      level: 'Ad Set',   val: sugg.age_gender_suggestion,  color: '#0891b2', bg: '#ecfeff' },
+                                { label: 'Placement',         level: 'Ad Set',   val: sugg.placement_suggestion,   color: '#0891b2', bg: '#ecfeff' },
+                                { label: 'Audience',          level: 'Ad Set',   val: sugg.targeting_suggestion,   color: '#0891b2', bg: '#ecfeff' },
+                                { label: 'Bid Strategy',      level: 'Ad Set',   val: sugg.bid_strategy_suggestion,color: '#d97706', bg: '#fffbeb' },
+                                { label: 'Budget',            level: 'Campaign', val: sugg.budget_suggestion,      color: '#d97706', bg: '#fffbeb' },
+                              ] as { label: string; level: string; val: string | null; color: string; bg: string }[]).filter(f => f.val).map(f => (
+                                <div key={f.label} style={{ background: f.bg, border: `1px solid ${f.color}30`, borderRadius: 10, padding: '10px 14px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: f.color }}>{f.label}</span>
+                                    {f.level && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: f.color, padding: '1px 6px', borderRadius: 8, textTransform: 'uppercase', letterSpacing: '.04em' }}>{f.level}</span>}
+                                  </div>
                                   <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{f.val}</div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>No specific suggestions generated for this ad.</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>No suggestions generated for this ad.</div>
                           )}
                         </div>
                       );
