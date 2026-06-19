@@ -881,6 +881,7 @@ export default function Dashboard() {
   // Meta Reports State
   const [metaInsights, setMetaInsights] = useState(null);
   const [metaCampaignInsights, setMetaCampaignInsights] = useState([]);
+  const [allCampaignsList, setAllCampaignsList] = useState<any[]>([]); // always full list for dropdown
   const [metaReportsLoading, setMetaReportsLoading] = useState(false);
   const [metaReportsError, setMetaReportsError] = useState("");
   const [selectedCampaignForReports, setSelectedCampaignForReports] = useState(null);
@@ -1267,6 +1268,7 @@ export default function Dashboard() {
       if (res.ok) {
         setMetaInsights(data.account || { spend: 0, impressions: 0, reach: 0, linkClicks: 0, inline_link_click_ctr: 0, leads: 0 });
         setMetaCampaignInsights(data.campaigns || []);
+        if (!campaignId) setAllCampaignsList(data.campaigns || []);
       } else {
         setMetaReportsError(data.error || "Failed to fetch Meta insights");
       }
@@ -3317,7 +3319,7 @@ export default function Dashboard() {
                 }}
               >
                 <option value="">All Campaigns</option>
-                {metaCampaignInsights.map((c: any) => (
+                {(allCampaignsList.length > 0 ? allCampaignsList : metaCampaignInsights).map((c: any) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
