@@ -204,6 +204,40 @@ async function getOrCreatePixelId(accessToken, adAccountId) {
   throw new Error("Unable to locate or create a Meta Tracking Pixel.");
 }
 
+// ── SMART LAUNCH: Pause existing ads at ad level so only the new ad goes live ──
+async function pauseExistingAdsInCampaign(campaignId: string, excludeAdId: string, accessToken: string, adAccountId: string): Promise<number> {
+  const filter = encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "EQUAL", value: campaignId }]));
+  const res = await fetch(
+    `https://graph.facebook.com/v21.0/act_${adAccountId}/ads?fields=id,name,status&filtering=${filter}&limit=200&access_token=${accessToken}`
+  );
+  const data = await fetchMetaJson(res);
+  const ads: { id: string; name: string; status: string }[] = (data.data || []).filter(
+    (ad: { id: string; status: string }) => ad.id !== excludeAdId && ad.status !== "PAUSED"
+  );
+  if (ads.length === 0) return 0;
+  await Promise.all(
+    ads.map((ad) =>
+      fetch(`https://graph.facebook.com/v21.0/${ad.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "PAUSED", access_token: accessToken }),
+      })
+    )
+  );
+  console.log(`Smart launch: paused ${ads.length} existing ads → ${ads.map((a) => a.name).join(", ")}`);
+  return ads.length;
+}
+
+async function resumeCampaignToActive(campaignId: string, accessToken: string): Promise<void> {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${campaignId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "ACTIVE", access_token: accessToken }),
+  });
+  await fetchMetaJson(res);
+  console.log(`Smart launch: campaign ${campaignId} resumed to ACTIVE`);
+}
+
 // ── STEP 2: Campaign ──
 async function createCampaign(existingCampaignId, adAccountId, accessToken, campaignName, objective, specialAdCats, isCbo, budgetType, dailyBudget, lifetimeBudget, adStatus = "PAUSED") {
   if (existingCampaignId) return existingCampaignId;
@@ -523,11 +557,20 @@ export async function POST(request) {
       adAccountId, accessToken, adName, adSetId, creativeId, trackingSpecs, adStatus
     );
 
+    // Smart launch: when adding a new live ad to an existing campaign,
+    // pause all previous ads at the ad level, then resume the campaign so only the new ad runs.
+    let pausedAdsCount = 0;
+    if (existingCampaignId && publishNow) {
+      pausedAdsCount = await pauseExistingAdsInCampaign(existingCampaignId, adId, accessToken, adAccountId);
+      await resumeCampaignToActive(existingCampaignId, accessToken);
+    }
+
     return Response.json({
       success: true,
       campaignId,
       adSetId,
       adId,
+      pausedAdsCount,
     });
   } catch (error) {
     console.error("Launch Error:", error);
