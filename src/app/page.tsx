@@ -2231,7 +2231,7 @@ export default function Dashboard() {
       audio_keys: adAudioKeysMap,
       scene_index_map: indexMap.map(m => ({ itemId: m.itemId, sceneIndex: m.sceneIndex })),
     };
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv881198.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
 
     // ── IMMEDIATE: unblock UI, start progress bar, keep workspace cards visible ──
     setAcceptingPrompts(false);
@@ -2356,7 +2356,7 @@ export default function Dashboard() {
     startVideoGenProgress();
     addSbToast(`🔄 Restarting generation for ${Object.keys(scenesForRequest).length} ad(s)…`, "success");
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv881198.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
     const payload = {
       report_id: analysisData?.id || crypto.randomUUID(),
       report_data: analysisData,
@@ -2454,7 +2454,7 @@ export default function Dashboard() {
       setRetryItemProgress(Math.min(99, Math.round(((Date.now() - retryStart) / CARD_RETRY_DURATION) * 100)));
     }, 2000);
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv881198.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
     const payload = {
       report_id: analysisData?.id || crypto.randomUUID(),
       report_data: analysisData,
@@ -2556,7 +2556,7 @@ export default function Dashboard() {
       if (Date.now() - retryStart >= RETRY_DURATION) clearInterval(retryGenTimerRef.current);
     }, 2000);
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv881198.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_ACCEPT_PROMPTS_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/3be958fe-3d6e-4ccf-8d72-5a9a0bb2d932";
     const payload = {
       report_id: analysisData?.id || crypto.randomUUID(),
       report_data: analysisData,
