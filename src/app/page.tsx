@@ -3248,7 +3248,7 @@ export default function Dashboard() {
       {tab === "overview" && (() => {
         // Compute dynamic top statistics
         const activeCampaigns = metaCampaignInsights.filter(c => c.effective_status === 'ACTIVE').length;
-        const totalCampaignsRendered = activeCampaigns || campaigns.length; // fallback
+        const totalCampaignsRendered = activeCampaigns || metaCampaignInsights.length; // fallback to total loaded
         const pendingAuthCount = (adData?.ad_scripts || []).filter(a => getAdStatus(a.id) === "pending").length;
 
         // Determine Top Performer
@@ -3262,6 +3262,7 @@ export default function Dashboard() {
         }
 
         const spendTotal = parseFloat(metaInsights?.spend || 0);
+        const reachTotal = parseFloat(metaInsights?.reach || 0);
         const impressionsTotal = parseFloat(metaInsights?.impressions || 0);
         const cpm = impressionsTotal > 0 ? (spendTotal / impressionsTotal * 1000).toFixed(2) : "0.00";
 
@@ -3342,7 +3343,10 @@ export default function Dashboard() {
                 )}
                 {/* Search button */}
                 <button
-                  onClick={() => fetchMetaInsights("custom", overviewCampaignId, overviewDateFrom, overviewDateTo)}
+                  onClick={() => {
+                    const hasDateRange = !!(overviewDateFrom && overviewDateTo);
+                    fetchMetaInsights(hasDateRange ? "custom" : "maximum", overviewCampaignId, overviewDateFrom, overviewDateTo);
+                  }}
                   disabled={metaReportsLoading}
                   style={{
                     padding: '6px 18px', borderRadius: 20, border: 'none',
@@ -3407,7 +3411,7 @@ export default function Dashboard() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                     {[
                       { label: "Total Inv.", value: `$${spendTotal.toFixed(2)}`, color: "var(--text)" },
-                      { label: "Total Reach", value: impressionsTotal.toLocaleString(), color: "var(--text)" },
+                      { label: "Total Reach", value: reachTotal.toLocaleString(), color: "var(--text)" },
                       { label: "Avg CPM", value: `$${cpm}`, color: "var(--primary)" },
                     ].map((stat) => (
                       <div key={stat.label} style={{ background: "#ffffff", padding: "12px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-light)", textAlign: "center" }}>
