@@ -1075,6 +1075,28 @@ export default function Dashboard() {
     }
   };
 
+  const handleSmartRun = async (adId: string, campaignId: string, adsetId: string) => {
+    setUpdatingStatusId(adId);
+    try {
+      const res = await fetch("/api/meta/smart-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ad_id: adId, campaign_id: campaignId, adset_id: adsetId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        addSbToast(`Ad is now live. Paused ${data.pausedSiblings} other ad(s).`, "success");
+        fetchLiveCampaigns();
+      } else {
+        addSbToast(data.error || "Failed to run ad", "error");
+      }
+    } catch (e) {
+      addSbToast("Network error", "error");
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
   const handleEditCampaign = async (campaignId) => {
     setEditModalOpen(true);
     setEditType("Campaign");
@@ -1324,16 +1346,19 @@ export default function Dashboard() {
     }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-load live ads strip when Overview tab opens
+  // Auto-load live ads strip when Overview tab opens or campaign filter changes
   useEffect(() => {
     if (tab !== "overview") return;
     setReportLiveLoading(true);
-    fetch("/api/meta/live-ads")
+    const url = overviewCampaignId
+      ? `/api/meta/live-ads?campaign_id=${encodeURIComponent(overviewCampaignId)}`
+      : "/api/meta/live-ads";
+    fetch(url)
       .then((r) => r.json())
       .then((d) => { setReportLiveAds(d.ads || []); })
       .catch(() => { setReportLiveAds([]); })
       .finally(() => setReportLiveLoading(false));
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, overviewCampaignId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On mount: if analysisStatus is "generating" but no sessionStorage flag,
   // it means the page was refreshed mid-analysis — reset to idle so user can re-trigger
@@ -1861,7 +1886,7 @@ export default function Dashboard() {
     }, 2000);
 
     try {
-      const webhookUrl = process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || "https://n8n.srv881198.hstgr.cloud/webhook/generate_ad";
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/generate_ad";
       const res = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -5981,7 +6006,7 @@ export default function Dashboard() {
                                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                   {[
                                     { label: "Edit", color: "var(--primary)", disabled: false, fn: () => handleEditAd(ad.id) },
-                                    { label: "Run", color: "var(--green)", disabled: ad.effective_status === "ACTIVE" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "ACTIVE", "run") },
+                                    { label: "Run", color: "var(--green)", disabled: ad.effective_status === "ACTIVE" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleSmartRun(ad.id, campaign.id, adset.id) },
                                     { label: "Pause", color: "var(--amber)", disabled: ad.effective_status === "PAUSED" || ad.effective_status === "IN_PROCESS" || updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", "PAUSED", "pause") },
                                     { label: "Delete", color: "var(--red-strong)", disabled: updatingStatusId === ad.id, fn: () => handleUpdateStatus(ad.id, "Ad", null, "delete") },
                                   ].map(btn => (

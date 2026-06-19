@@ -38,7 +38,7 @@ export async function POST(request) {
     }
 
     // Call external webhook with full report data
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || 'https://n8n.srv881198.hstgr.cloud/webhook/generate_ad';
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || 'https://n8n.srv1208919.hstgr.cloud/webhook/generate_ad';
     console.log('Triggering webhook:', webhookUrl);
 
     try {

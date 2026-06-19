@@ -6,7 +6,7 @@ export const maxDuration = 300;
 
 const WEBHOOKS: Record<string, string> = {
   competitor_analysis: process.env.N8N_COMPETITOR_ANALYSIS_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/meta_ads_scraper",
-  generate_ad: process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || "https://n8n.srv881198.hstgr.cloud/webhook/generate_ad",
+  generate_ad: process.env.NEXT_PUBLIC_N8N_GENERATE_AD_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/generate_ad",
 };
 
 // Fetch using explicit IPv4 + proper SNI so SSL cert validation still works

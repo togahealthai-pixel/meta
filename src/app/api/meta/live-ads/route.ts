@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
-export async function GET() {
+export async function GET(request: Request) {
   const token = process.env.META_ACCESS_TOKEN;
   const account = process.env.META_AD_ACCOUNT_ID;
 
@@ -10,10 +10,19 @@ export async function GET() {
     return NextResponse.json({ error: "Missing Meta credentials" }, { status: 500 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const campaignId = searchParams.get("campaign_id");
+
   try {
-    // Fetch only ACTIVE ads
+    // Fetch only ACTIVE ads, optionally filtered by campaign
     const adFields = "id,name,effective_status,campaign_id,adset_id,creative{thumbnail_url,image_url}";
-    const adsUrl = `${GRAPH}/act_${account}/ads?fields=${adFields}&effective_status=["ACTIVE"]&limit=100&access_token=${token}`;
+    let adsUrl: string;
+    if (campaignId) {
+      const filter = encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "EQUAL", value: campaignId }]));
+      adsUrl = `${GRAPH}/act_${account}/ads?fields=${adFields}&filtering=${filter}&effective_status=["ACTIVE"]&limit=100&access_token=${token}`;
+    } else {
+      adsUrl = `${GRAPH}/act_${account}/ads?fields=${adFields}&effective_status=["ACTIVE"]&limit=100&access_token=${token}`;
+    }
     const adsRes = await fetch(adsUrl);
     const adsData = await adsRes.json();
 
