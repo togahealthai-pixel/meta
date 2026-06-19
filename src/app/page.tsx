@@ -2017,11 +2017,15 @@ export default function Dashboard() {
     responses.forEach((raw) => {
       if (!raw || typeof raw !== "object") return;
 
+      // Support both raw.results (old format) and raw.data (n8n seedance format)
+      const resultsArr: any[] | null = Array.isArray(raw.results) ? raw.results
+        : Array.isArray(raw.data) ? raw.data
+        : null;
+
       // ── Step 1: identify which itemId this entire response belongs to ──
-      // Use the first SUCCESS result's prompt to detect the owning item
       let ownerItemId: any = null;
-      if (Array.isArray(raw.results)) {
-        for (const r of raw.results) {
+      if (resultsArr) {
+        for (const r of resultsArr) {
           const m = matchByPrompt(r.prompt || "");
           if (m) { ownerItemId = m.itemId; break; }
         }
@@ -2032,31 +2036,34 @@ export default function Dashboard() {
         ? indexMap.filter(m => m.itemId === ownerItemId)
         : [];
 
-      // ── Step 3: extract failures from results[] ──
-      if (Array.isArray(raw.results)) {
-        raw.results
-          .filter((r: any) => r.success === false || r.state === "fail" || r.state === "error")
-          .forEach((r: any) => {
-            const key = r.taskId || (r.prompt || "").slice(0, 80) || String(r.index);
-            if (seen.has(key)) return;
-            seen.add(key);
+      // ── Step 3: extract failures ──
+      if (resultsArr) {
+        resultsArr.forEach((r: any, localIdx: number) => {
+          if (r.success !== false && r.state !== "fail" && r.state !== "error") return;
+          const key = r.taskId || (r.prompt || "").slice(0, 80) || String(localIdx);
+          if (seen.has(key)) return;
+          seen.add(key);
 
-            // Primary: match by prompt text
-            let mapped = matchByPrompt(r.prompt || "");
-            // Fallback: local index within the detected item
-            if (!mapped && ownerScenes.length > 0) mapped = ownerScenes[r.index] ?? null;
-            // Last resort: global index
-            if (!mapped) mapped = indexMap[r.index] ?? null;
+          // Primary: match by prompt text
+          let mapped = matchByPrompt(r.prompt || "");
+          // Fallback: local index within the detected item
+          if (!mapped && ownerScenes.length > 0) mapped = ownerScenes[r.index ?? localIdx] ?? null;
+          // Last resort: global sequential index (n8n preserves insertion order in data[])
+          if (!mapped) mapped = indexMap[r.index ?? localIdx] ?? null;
 
-            failures.push({
-              taskId: r.taskId || "",
-              prompt: r.prompt || "",
-              failMsg: r.failMsg || r.reason || "Generation failed.",
-              itemId: mapped?.itemId ?? ownerItemId ?? null,
-              sceneIndex: mapped?.sceneIndex ?? r.index,
-              scene: mapped?.scene ?? null,
-            });
+          const failMsg = r.failMsg
+            ? (r.failCode ? `[${r.failCode}] ${r.failMsg}` : r.failMsg)
+            : r.reason || "Generation failed.";
+
+          failures.push({
+            taskId: r.taskId || "",
+            prompt: r.prompt || "",
+            failMsg,
+            itemId: mapped?.itemId ?? ownerItemId ?? null,
+            sceneIndex: mapped?.sceneIndex ?? (r.index ?? localIdx),
+            scene: mapped?.scene ?? null,
           });
+        });
       }
 
       // ── Step 4: failedPrompts[] as additional fallback ──
@@ -2064,7 +2071,7 @@ export default function Dashboard() {
         raw.failedPrompts.forEach((fp: any) => {
           const prompt = fp.prompt || "";
           const key = prompt.slice(0, 80);
-          if (seen.has(key)) return; // already captured via results[]
+          if (seen.has(key)) return;
           seen.add(key);
           const mapped = matchByPrompt(prompt);
           failures.push({
@@ -2089,16 +2096,22 @@ export default function Dashboard() {
 
     responses.forEach((raw) => {
       if (!raw || typeof raw !== "object") return;
+
+      // Support both raw.results (old format) and raw.data (n8n seedance format)
+      const resultsArr: any[] | null = Array.isArray(raw.results) ? raw.results
+        : Array.isArray(raw.data) ? raw.data
+        : null;
+
       // Only mark complete if zero failures in this response object
       const failCount = typeof raw.failCount === "number" ? raw.failCount
-        : Array.isArray(raw.results) ? raw.results.filter((r: any) => !r.success || r.state === "fail" || r.state === "error").length
+        : resultsArr ? resultsArr.filter((r: any) => r.success === false || r.state === "fail" || r.state === "error").length
         : 1;
       if (failCount > 0) return;
 
       // Detect owner itemId by matching any result's prompt
       let ownerItemId: any = null;
-      if (Array.isArray(raw.results)) {
-        for (const r of raw.results) {
+      if (resultsArr) {
+        for (const r of resultsArr) {
           const prompt = (r.prompt || "").trim();
           if (!prompt || prompt.length < 20) continue;
           const needle = prompt.slice(0, 80).toLowerCase();
@@ -2107,6 +2120,10 @@ export default function Dashboard() {
             return hay && (hay === needle || hay.includes(needle.slice(0, 50)) || needle.includes(hay.slice(0, 50)));
           });
           if (match) { ownerItemId = match.itemId; break; }
+        }
+        // Fallback: if prompt matching fails (n8n transforms prompts), use first item's indexMap entry
+        if (!ownerItemId && resultsArr.length > 0 && indexMap.length > 0) {
+          ownerItemId = indexMap[0].itemId;
         }
       }
       if (ownerItemId && !successIds.includes(String(ownerItemId))) {
@@ -2278,6 +2295,15 @@ export default function Dashboard() {
           setGenerationActive(false);
           setFailedPrompts(failures);
           addSbToast(`⚠️ ${failures.length} scene(s) failed. Click the red card to view and fix prompts.`, "error");
+        } else {
+          // All tasks finished with no failures — stop loader (Supabase poll handles the success UI)
+          const total = responseData?.total ?? 0;
+          const done = (responseData?.successCount ?? 0) + (responseData?.failCount ?? 0);
+          if (total > 0 && done >= total) {
+            stopVideoGenProgress(true);
+            clearInterval(videoGenPollRef.current);
+            setGenerationActive(false);
+          }
         }
       })
       .catch(() => { clearTimeout(bgTimeout); });
@@ -2388,6 +2414,14 @@ export default function Dashboard() {
           setGenerationActive(false);
           setFailedPrompts(failures);
           addSbToast(`⚠️ ${failures.length} scene(s) failed again. Fix and retry.`, "error");
+        } else {
+          const total = responseData?.total ?? 0;
+          const done = (responseData?.successCount ?? 0) + (responseData?.failCount ?? 0);
+          if (total > 0 && done >= total) {
+            stopVideoGenProgress(true);
+            clearInterval(videoGenPollRef.current);
+            setGenerationActive(false);
+          }
         }
       })
       .catch(() => { clearTimeout(bgTimeout); });
