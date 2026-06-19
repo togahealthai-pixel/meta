@@ -1402,7 +1402,7 @@ export default function Dashboard() {
             // Link to active analysis if topic matches — use ref to avoid stale closure bug
             const newReport = parseSbReport(payload.new);
             const currentTopic = pendingTopicRef.current;
-            if (currentTopic && newReport.topic === currentTopic) {
+            if (currentTopic && rowMatchesTopic(payload.new, currentTopic)) {
               setAnalysisData({ ...newReport, id: payload.new.id });
               setAnalysisStatus("done");
               setAnalysisProgress(100);
@@ -1609,13 +1609,35 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [analysisStatus]);
 
-  function parseSbReport(row) {
+  function normalizeAnalysisData(data: any) {
+    if (!data || typeof data !== "object") return data;
+    return {
+      ...data,
+      // Map n8n field names → UI field names (n8n uses snake_case without _table suffix)
+      competitors_table: data.competitors_table || data.competitor_analysis || [],
+      hooks_table: data.hooks_table || data.hook_analysis || [],
+      market_insights_table: data.market_insights_table || data.market_insights || [],
+      gaps_table: data.gaps_table || data.gap_opportunities || [],
+    };
+  }
+
+  // Returns true if this Supabase row's report matches the given topic keyword
+  function rowMatchesTopic(row: any, topic: string): boolean {
+    const r = parseSbReport(row);
+    if (r.topic === topic) return true;
+    try {
+      const inputs = typeof row.inputs === "string" ? JSON.parse(row.inputs) : (row.inputs || {});
+      return inputs.topic === topic || (Array.isArray(inputs.keywords) && inputs.keywords[0] === topic);
+    } catch { return false; }
+  }
+
+  function parseSbReport(row: any) {
     let rd = row.report_data;
     try {
       if (typeof rd === "string") rd = JSON.parse(rd);
       // Handle array-wrapped format: [{...}] → {...}
       if (Array.isArray(rd)) rd = rd[0] || {};
-      return rd || {};
+      return normalizeAnalysisData(rd) || {};
     } catch { return {}; }
   }
 
@@ -2645,7 +2667,7 @@ export default function Dashboard() {
       }, setAnalysisStatus);
 
       if (result && !result.error) {
-        setAnalysisData(result);
+        setAnalysisData(normalizeAnalysisData(result));
         setAnalysisStatus("done");
         setAnalysisProgress(100);
         window.localStorage.removeItem("toga_analysis_start");
@@ -2670,10 +2692,7 @@ export default function Dashboard() {
               .select("*")
               .order("created_at", { ascending: false })
               .limit(5);
-            const match = data?.find((row: any) => {
-              const r = parseSbReport(row);
-              return r.topic === topic;
-            });
+            const match = data?.find((row: any) => rowMatchesTopic(row, topic));
             if (match) {
               clearInterval(pollInterval);
               const parsed = parseSbReport(match);
