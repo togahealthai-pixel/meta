@@ -161,6 +161,9 @@ export default function SocialDash() {
   const [progress, setProgress] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generationType, setGenerationType] = useState<'video' | 'images' | null>(null);
+  const [videoIsGenerating, setVideoIsGenerating] = useState<boolean>(false);
+  const [videoProgress, setVideoProgress] = useState<number>(0);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const prevStatusRef = useRef<string | undefined>(undefined); // tracks previous status to detect transitions
   const hasTriggeredInSession = useRef<boolean>(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
@@ -340,25 +343,33 @@ export default function SocialDash() {
     return () => { socialSupabase.removeChannel(channel); };
   }, []);
 
-  // Timer logic for progress bar (max 6 minutes = 360s for video, 60s for images)
+  // Timer for video pipeline progress (max 6 minutes = 360s)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isGenerating) {
-      const MAX_TIME = generationType === 'images' ? 60 : 360; // seconds
+    if (videoIsGenerating) {
       interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 98) {
-            clearInterval(interval);
-            return 98; // Stay at 98% until status changes to success
-          }
-          return prev + (100 / MAX_TIME);
+        setVideoProgress((prev) => {
+          if (prev >= 98) { clearInterval(interval); return 98; }
+          return prev + (100 / 360);
         });
       }, 1000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isGenerating, generationType]);
+    return () => { if (interval) clearInterval(interval); };
+  }, [videoIsGenerating]);
+
+  // Timer for image pipeline progress (max 60s)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isGenerating) {
+      interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 98) { clearInterval(interval); return 98; }
+          return prev + (100 / 60);
+        });
+      }, 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [isGenerating]);
 
   // Monitor status to trigger video preview refresh only (completely decoupled from prompt/image loading progress)
   useEffect(() => {
@@ -366,8 +377,8 @@ export default function SocialDash() {
     const prevIsDone = prevStatusRef.current?.toLowerCase().includes("successfully") || prevStatusRef.current?.toLowerCase().includes("completed");
     const isFirstLoad = prevStatusRef.current === undefined;
 
-    if (isDone && !isFirstLoad && !prevIsDone) {
-      // ✅ Status changed to done (e.g. video created successfully) — refresh preview
+    if (isDone && !isFirstLoad && !prevIsDone && !isGenerating) {
+      // ✅ Status changed to done during video pipeline — refresh preview
       handleRefreshPreview();
       showToast("Video preview updated!", "success");
     }
@@ -484,6 +495,8 @@ export default function SocialDash() {
 
   const handleImagePromptSubmit = async (prompt: string) => {
     setShowImageModal(false);
+    setGeneratedScenes([]);
+    setSceneFailures({});
     setStatus("Generating images...");
     setIsGenerating(true);
     setGenerationType('images');
@@ -743,9 +756,8 @@ export default function SocialDash() {
     setAcceptedStory(null); // Clear any previous accepted story
     
     // Start progress bar loader immediately on click
-    setIsGenerating(true);
-    setGenerationType('video');
-    setProgress(0);
+    setVideoIsGenerating(true);
+    setVideoProgress(0);
     hasTriggeredInSession.current = true;
     localStorage.setItem('sd_generation_start', Date.now().toString()); // ── Persist start time
     setStatus("Accepting story and generating prompts...");
@@ -772,10 +784,9 @@ export default function SocialDash() {
       console.log("[UI] Story accepted, scenes returned directly from webhook response. Rendering.");
       setGeneratedScenes(scenes);
       setAcceptedStory(backupStory); // Retain accepted story text
-      setProgress(100);
+      setVideoProgress(100);
       setTimeout(() => {
-        setIsGenerating(false);   // Turn off loader since prompts are ready on UI
-        setGenerationType(null);
+        setVideoIsGenerating(false);
       }, 1000);
     } else {
       if (isAccepted) {
@@ -783,16 +794,15 @@ export default function SocialDash() {
       } else {
         console.warn("[UI] Accept webhook failed or was rejected.");
       }
-      setIsGenerating(false);
-      setGenerationType(null);
+      setVideoIsGenerating(false);
     }
   };
 
   const handleConfirmPrompts = async () => {
     setSceneFailures({}); // clear any previous failures
-    setIsGenerating(true);
-    setGenerationType('video');
-    setProgress(0);
+    setVideoIsGenerating(true);
+    setVideoProgress(0);
+    setIsConfirming(true);
     hasTriggeredInSession.current = true;
     localStorage.setItem('sd_generation_start', Date.now().toString());
     setStatus("Generating your social video preview...");
@@ -801,7 +811,6 @@ export default function SocialDash() {
     console.log("[UI] Confirming prompts to:", webhookUrl);
 
     let result: any = null;
-    setLoading('confirm'); // disable button + hide scenes immediately
     try {
       // Use direct fetch through proxy so we can read the body even on non-200 responses
       const proxyRes = await fetch('/api/proxy', {
@@ -819,7 +828,7 @@ export default function SocialDash() {
     } catch (err) {
       console.error("[UI] Confirm prompts fetch error:", err);
     } finally {
-      setLoading(null);
+      setIsConfirming(false);
     }
 
     if (result) {
@@ -841,26 +850,23 @@ export default function SocialDash() {
           };
         });
         setSceneFailures(failures);
-        setIsGenerating(false);
-        setGenerationType(null);
+        setVideoIsGenerating(false);
         showToast(`${failedResults.length} prompt(s) failed — edit the highlighted scenes and resubmit.`, 'info');
         return;
       }
 
       // All succeeded
       console.log("[UI] Prompts confirmed and video created successfully:", result);
-      setProgress(100);
+      setVideoProgress(100);
       setGeneratedScenes([]);
       setAcceptedStory(null);
       handleRefreshPreview();
       setTimeout(() => {
-        setIsGenerating(false);
-        setGenerationType(null);
+        setVideoIsGenerating(false);
       }, 1000);
     } else {
       console.warn("[UI] Confirm prompts webhook failed with no data.");
-      setIsGenerating(false);
-      setGenerationType(null);
+      setVideoIsGenerating(false);
     }
   };
 
@@ -1931,7 +1937,7 @@ export default function SocialDash() {
               </button>
 
               {/* ---- Generation Progress (inside the input card) ---- */}
-              {isGenerating && generationType !== 'images' && (
+              {videoIsGenerating && (
                 <div style={{ marginTop: 4, padding: '16px', borderRadius: 12, background: '#f0fdfa', border: '1.5px solid #99f6e4' }} className="animate-fade-in">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 9, background: '#ccfbf1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1941,10 +1947,10 @@ export default function SocialDash() {
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Video Generation in Progress</div>
                       <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>System is processing your request. Preview will update automatically.</div>
                     </div>
-                    <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: '#0d9488' }}>{Math.round(progress)}%</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: '#0d9488' }}>{Math.round(videoProgress)}%</span>
                   </div>
                   <div style={{ height: 6, background: '#ccfbf1', borderRadius: 6, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #0d9488, #0284c7)', borderRadius: 6, transition: 'width 0.4s ease' }} />
+                    <div style={{ height: '100%', width: `${videoProgress}%`, background: 'linear-gradient(90deg, #0d9488, #0284c7)', borderRadius: 6, transition: 'width 0.4s ease' }} />
                   </div>
                 </div>
               )}
@@ -1989,10 +1995,10 @@ export default function SocialDash() {
                     className="sd-btn-primary" 
                     style={{ width: 'auto', fontSize: 12, padding: '8px 20px', background: '#16a34a' }}
                     onClick={handleAcceptStory}
-                    disabled={loading === 'accept'}
+                    disabled={loading === 'accept' || videoIsGenerating}
                   >
-                    {loading === 'accept' 
-                      ? <><Spinner size={14} color="white" /> Processing...</> 
+                    {loading === 'accept'
+                      ? <><Spinner size={14} color="white" /> Processing...</>
                       : <><CheckCircle2 size={14} /> Accept Story</>}
                   </button>
                 </div>
@@ -2000,7 +2006,7 @@ export default function SocialDash() {
             </div>
           )}
 
-          {generatedScenes && generatedScenes.length > 0 && loading !== 'confirm' && (() => {
+          {generatedScenes && generatedScenes.length > 0 && !isConfirming && !videoIsGenerating && (() => {
             const failCount = Object.keys(sceneFailures).length;
             return (
             <div className="sd-action-card animate-fade-in" style={{ paddingBottom: 0, border: failCount > 0 ? '2px solid #ef4444' : undefined, boxShadow: failCount > 0 ? '0 8px 32px rgba(220,38,38,0.15)' : undefined }}>
@@ -2164,9 +2170,9 @@ export default function SocialDash() {
                       borderRadius: 8
                     }}
                     onClick={handleConfirmPrompts}
-                    disabled={loading === 'confirm'}
+                    disabled={isConfirming || videoIsGenerating}
                   >
-                    {loading === 'confirm' ? (
+                    {isConfirming ? (
                       <><Spinner size={14} color="white" /> Confirming...</>
                     ) : failCount > 0 ? (
                       <><CheckCircle2 size={14} /> Resubmit Prompts →</>
