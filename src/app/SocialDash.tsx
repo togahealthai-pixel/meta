@@ -164,6 +164,10 @@ export default function SocialDash() {
   const [videoIsGenerating, setVideoIsGenerating] = useState<boolean>(false);
   const [videoProgress, setVideoProgress] = useState<number>(0);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [videoKey, setVideoKey] = useState<number>(0);
+  const pendingVideoRef = useRef<boolean>(false);
+  const videoGenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentVideoUrlRef = useRef<string | null>(null);
   const prevStatusRef = useRef<string | undefined>(undefined); // tracks previous status to detect transitions
   const hasTriggeredInSession = useRef<boolean>(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
@@ -231,18 +235,23 @@ export default function SocialDash() {
     const fetchVideoData = async () => {
       try {
         const res = await fetch('/api/video-metadata');
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
-        if (data) {
-          if (data.video_link) {
+        if (data?.video_link) {
+          if (data.video_link !== currentVideoUrlRef.current) {
+            // New video URL written by n8n — update preview
+            currentVideoUrlRef.current = data.video_link;
             setSupabaseVideoUrl(data.video_link);
-          }
-          if (data.metadata) {
-            setVideoMetadata(data.metadata);
+            setVideoKey(k => k + 1);
+            if (pendingVideoRef.current) {
+              pendingVideoRef.current = false;
+              if (videoGenTimeoutRef.current) clearTimeout(videoGenTimeoutRef.current);
+              setVideoIsGenerating(false);
+              setVideoProgress(100);
+            }
           }
         }
+        if (data?.metadata) setVideoMetadata(data.metadata);
       } catch (err) {
         console.error("Error fetching video data from server API proxy:", err);
       }
@@ -276,8 +285,16 @@ export default function SocialDash() {
       .channel('videos-all-cols')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'videos', filter: 'id=eq.1' }, (payload: any) => {
         console.log('[Videos channel update] payload:', payload);
-        if (payload.new?.video_link) {
+        if (payload.new?.video_link && payload.new.video_link !== currentVideoUrlRef.current) {
+          currentVideoUrlRef.current = payload.new.video_link;
           setSupabaseVideoUrl(payload.new.video_link);
+          setVideoKey(k => k + 1);
+          if (pendingVideoRef.current) {
+            pendingVideoRef.current = false;
+            if (videoGenTimeoutRef.current) clearTimeout(videoGenTimeoutRef.current);
+            setVideoIsGenerating(false);
+            setVideoProgress(100);
+          }
         }
         if (payload.new?.metadata) {
           setVideoMetadata(payload.new.metadata);
@@ -395,7 +412,12 @@ export default function SocialDash() {
       if (res.ok) {
         const data = await res.json();
         if (data?.video_link) {
-          setSupabaseVideoUrl(`${data.video_link}?t=${Date.now()}`);
+          if (data.video_link !== currentVideoUrlRef.current) {
+            currentVideoUrlRef.current = data.video_link;
+            setSupabaseVideoUrl(data.video_link);
+          }
+          // Force the video element to reload (same or new URL)
+          setVideoKey(k => k + 1);
         }
         if (data?.metadata) {
           setVideoMetadata(data.metadata);
@@ -853,15 +875,20 @@ export default function SocialDash() {
         return;
       }
 
-      // All succeeded
-      console.log("[UI] Prompts confirmed and video created successfully:", result);
-      setVideoProgress(100);
+      // All succeeded — prompts accepted, video is now rendering async in n8n
+      console.log("[UI] Prompts confirmed, video rendering started:", result);
       setGeneratedScenes([]);
       setAcceptedStory(null);
-      handleRefreshPreview();
-      setTimeout(() => {
-        setVideoIsGenerating(false);
-      }, 1000);
+      // Keep videoIsGenerating=true — will be cleared when Supabase videos row is updated
+      pendingVideoRef.current = true;
+      // Safety fallback: clear after 8 minutes if Supabase never fires
+      videoGenTimeoutRef.current = setTimeout(() => {
+        if (pendingVideoRef.current) {
+          pendingVideoRef.current = false;
+          setVideoIsGenerating(false);
+        }
+      }, 8 * 60 * 1000);
+      showToast("Video is rendering — preview will update automatically when ready.", "success");
     } else {
       console.warn("[UI] Confirm prompts webhook failed with no data.");
       setVideoIsGenerating(false);
@@ -1382,7 +1409,7 @@ export default function SocialDash() {
 
         {/* Video Player */}
         <div style={{ width: '100%', background: '#000000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '240px' }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoKey} />
         </div>
 
         {/* Engagement Icons */}
@@ -1432,7 +1459,7 @@ export default function SocialDash() {
 
         {/* Video Player */}
         <div style={{ width: '100%', background: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px' }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoKey} />
         </div>
 
         {/* Action bar */}
@@ -1470,7 +1497,7 @@ export default function SocialDash() {
 
         {/* Video Player */}
         <div style={{ width: '100%', background: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px' }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoKey} />
         </div>
 
         {/* Action bar */}
@@ -1491,7 +1518,7 @@ export default function SocialDash() {
         
         {/* Fullscreen Video Background */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} key={videoKey} />
           {/* Subtle bottom gradient cover */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '140px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', pointerEvents: 'none' }} />
         </div>
@@ -1550,7 +1577,7 @@ export default function SocialDash() {
       <div style={{ background: '#ffffff', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
         {/* Video Player */}
         <div style={{ width: '100%', background: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', aspectRatio: '16/9' }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoKey} />
         </div>
 
         {/* Video metadata */}
@@ -1617,7 +1644,7 @@ export default function SocialDash() {
 
         {/* Video Player */}
         <div style={{ width: '100%', background: '#000000', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', marginBottom: '10px' }}>
-          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoSrc} />
+          <video ref={videoRef} src={videoSrc} controls style={{ width: '100%', height: '100%', objectFit: 'contain' }} key={videoKey} />
         </div>
 
         {/* Engagement Row */}
