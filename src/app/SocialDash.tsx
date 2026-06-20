@@ -2548,30 +2548,44 @@ export default function SocialDash() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
                 
                 {/* Image Prompt Textarea */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Image Generation Prompt
-                  </label>
-                  <textarea 
-                    value={imagePrompt}
-                    onChange={(e) => setImagePrompt(e.target.value)}
-                    placeholder="e.g. Modern dental clinic interior, professional lighting, warm patient care atmosphere, highly detailed..."
-                    style={{ 
-                      height: '65px', 
-                      minHeight: '50px', 
-                      padding: '10px 12px', 
-                      fontSize: '12px', 
-                      border: '1px solid #cbd5e1', 
-                      borderRadius: '8px', 
-                      background: '#f8fafc',
-                      color: '#0f172a',
-                      resize: 'none',
-                      fontFamily: 'inherit',
-                      outline: 'none'
-                    }}
-                    required
-                  />
-                </div>
+                {(() => {
+                  const wordCount = imagePrompt.trim() ? imagePrompt.trim().split(/\s+/).length : 0;
+                  const meetsMin = wordCount >= 10;
+                  return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                      Image Generation Prompt
+                    </label>
+                    <textarea
+                      value={imagePrompt}
+                      onChange={(e) => setImagePrompt(e.target.value)}
+                      placeholder="e.g. Modern dental clinic interior, professional lighting, warm patient care atmosphere, highly detailed..."
+                      style={{
+                        height: '65px',
+                        minHeight: '50px',
+                        padding: '10px 12px',
+                        fontSize: '12px',
+                        border: `1px solid ${imagePrompt.trim() && !meetsMin ? '#f97316' : '#cbd5e1'}`,
+                        borderRadius: '8px',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        resize: 'none',
+                        fontFamily: 'inherit',
+                        outline: 'none'
+                      }}
+                      required
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {imagePrompt.trim() && !meetsMin && (
+                        <span style={{ fontSize: '10px', color: '#f97316', fontWeight: 600 }}>Minimum 10 words required</span>
+                      )}
+                      <span style={{ fontSize: '10px', color: meetsMin ? '#16a34a' : '#94a3b8', fontWeight: 600, marginLeft: 'auto' }}>
+                        {wordCount}/10 words
+                      </span>
+                    </div>
+                  </div>
+                  );
+                })()}
 
                 {/* Aspect Ratio Toggle Selector */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
@@ -2622,7 +2636,7 @@ export default function SocialDash() {
                 <button
                   className="sd-btn-primary"
                   onClick={() => handleImagePromptSubmit(imagePrompt)}
-                  disabled={loading === 'images' || isImageGenerating || !imagePrompt.trim()}
+                  disabled={loading === 'images' || isImageGenerating || imagePrompt.trim().split(/\s+/).filter(Boolean).length < 10}
                   style={{ background: medicalBlue, boxShadow: 'none', padding: '11px 16px' }}
                 >
                   {loading === 'images'
