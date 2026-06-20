@@ -1435,27 +1435,77 @@ export default function Dashboard() {
     if (!stored) return;
     const start = Number(stored);
     const elapsed = Date.now() - start;
-    if (elapsed < VIDEO_GEN_DURATION) {
-      setVideoGenerating(true);
-      setVideoGenProgress(Math.min(99, Math.round((elapsed / VIDEO_GEN_DURATION) * 100)));
-      clearInterval(videoGenTimerRef.current);
-      videoGenTimerRef.current = setInterval(() => {
-        const e2 = Date.now() - start;
-        setVideoGenProgress(Math.min(99, Math.round((e2 / VIDEO_GEN_DURATION) * 100)));
-        if (e2 >= VIDEO_GEN_DURATION) clearInterval(videoGenTimerRef.current);
-      }, 2000);
-    } else {
+    if (elapsed >= VIDEO_GEN_DURATION) {
       window.localStorage.removeItem("toga_video_gen_start");
+      return;
     }
+    // Check if video already completed during the gap — json data populated = fully done
+    supabase
+      .from("your_name_table")
+      .select('id, time, text, format, Approved, "json data"')
+      .gte("time", new Date(start - 5000).toISOString())
+      .order("time", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        const done = (data || []).filter((r: any) => r['json data'] !== null);
+        if (done.length > 0) {
+          // Already complete — clear bar, don't restore it
+          window.localStorage.removeItem("toga_video_gen_start");
+          setGenerationActive(false);
+          return;
+        }
+        // Still in progress — resume bar
+        setVideoGenerating(true);
+        setGenerationActive(true);
+        setVideoGenProgress(Math.min(99, Math.round((elapsed / VIDEO_GEN_DURATION) * 100)));
+        clearInterval(videoGenTimerRef.current);
+        videoGenTimerRef.current = setInterval(() => {
+          const e2 = Date.now() - start;
+          setVideoGenProgress(Math.min(99, Math.round((e2 / VIDEO_GEN_DURATION) * 100)));
+          if (e2 >= VIDEO_GEN_DURATION) clearInterval(videoGenTimerRef.current);
+        }, 2000);
+        // Restart poll so completion can be detected on this new page load
+        clearInterval(videoGenPollRef.current);
+        videoGenPollRef.current = setInterval(async () => {
+          if (Date.now() - start > VIDEO_GEN_DURATION) {
+            clearInterval(videoGenPollRef.current);
+            setGenerationActive(false);
+            return;
+          }
+          try {
+            const { data: pollData } = await supabase
+              .from("your_name_table")
+              .select('id, time, text, format, Approved, "json data"')
+              .gte("time", new Date(start - 5000).toISOString())
+              .order("time", { ascending: false })
+              .limit(10);
+            const complete = (pollData || []).filter((r: any) => r['json data'] !== null);
+            if (complete.length > 0) {
+              clearInterval(videoGenPollRef.current);
+              stopVideoGenProgress(true);
+              setGenerationActive(false);
+              await fetchAdTableLinks();
+              setAllApprovedAds(prev => {
+                const newIds = new Set(complete.map((d: any) => `${d.id}_${d.time}`));
+                return [...complete, ...prev.filter((a: any) => !newIds.has(`${a.id}_${a.time}`))];
+              });
+              addSbToast("✅ Ads generated successfully! Check Ad Previews below.", "success");
+              setTimeout(() => resetCreateTabWorkspace(), 2000);
+            }
+          } catch {}
+        }, 30_000);
+      });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Supabase realtime: detect new videos from n8n ──
+  // ── Supabase realtime: detect completed videos/images from n8n ──
   useEffect(() => {
     const adsChannel = supabase
       .channel("your_name_table_realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "your_name_table" }, async (payload) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "your_name_table" }, async (payload) => {
         if (!videoGenerating && !imageGenerating) return;
         const newAd = payload.new as any;
+        // Wait for json data — that field populates when the metadata workflow completes (~15s after video stored)
+        if (!newAd['json data']) return;
         await fetchAdTableLinks();
         setAllApprovedAds(prev => {
           const exists = prev.some((a: any) => `${a.id}_${a.time}` === `${newAd.id}_${newAd.time}`);
@@ -1463,6 +1513,7 @@ export default function Dashboard() {
         });
         if (videoGenerating) {
           stopVideoGenProgress(true);
+          setGenerationActive(false);
           addSbToast("✅ Video Generated Successfully! Check Ad Previews below.", "success");
           setTimeout(() => resetCreateTabWorkspace(), 2000);
         } else if (imageGenerating) {
@@ -2242,7 +2293,7 @@ export default function Dashboard() {
     startVideoGenProgress();
     addSbToast("✅ Prompts accepted! Generation started — cards will update when done.", "success");
 
-    // Start Supabase polling for completed videos
+    // Start Supabase polling for completed videos — only rows with json data are truly done
     const genStart = Date.now();
     clearInterval(videoGenPollRef.current);
     videoGenPollRef.current = setInterval(async () => {
@@ -2254,18 +2305,20 @@ export default function Dashboard() {
       try {
         const { data } = await supabase
           .from("your_name_table")
-          .select("id, time, text, format, Approved")
+          .select('id, time, text, format, Approved, "json data"')
           .gte("time", new Date(genStart - 5000).toISOString())
           .order("time", { ascending: false })
           .limit(10);
-        if (data && data.length > 0) {
+        // Only rows with json data populated = metadata workflow ran = fully complete
+        const complete = (data || []).filter((r: any) => r['json data'] !== null);
+        if (complete.length > 0) {
           clearInterval(videoGenPollRef.current);
           stopVideoGenProgress(true);
           setGenerationActive(false);
           await fetchAdTableLinks();
           setAllApprovedAds(prev => {
-            const newIds = new Set(data.map((d: any) => `${d.id}_${d.time}`));
-            return [...data, ...prev.filter((a: any) => !newIds.has(`${a.id}_${a.time}`))];
+            const newIds = new Set(complete.map((d: any) => `${d.id}_${d.time}`));
+            return [...complete, ...prev.filter((a: any) => !newIds.has(`${a.id}_${a.time}`))];
           });
           addSbToast("✅ Ads generated successfully! Check Ad Previews below.", "success");
           setTimeout(() => resetCreateTabWorkspace(), 2000);
