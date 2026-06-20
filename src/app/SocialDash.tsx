@@ -495,8 +495,6 @@ export default function SocialDash() {
 
   const handleImagePromptSubmit = async (prompt: string) => {
     setShowImageModal(false);
-    setGeneratedScenes([]);
-    setSceneFailures({});
     setStatus("Generating images...");
     setIsGenerating(true);
     setGenerationType('images');
