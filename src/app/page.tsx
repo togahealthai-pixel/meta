@@ -3335,7 +3335,11 @@ export default function Dashboard() {
                 <input
                   type="date"
                   value={overviewDateFrom}
-                  onChange={(e) => setOverviewDateFrom(e.target.value)}
+                  onChange={(e) => {
+                    const newFrom = e.target.value;
+                    setOverviewDateFrom(newFrom);
+                    if (newFrom && overviewDateTo) fetchMetaInsights("custom", overviewCampaignId, newFrom, overviewDateTo);
+                  }}
                   style={{
                     padding: '5px 10px', borderRadius: 20, border: '1.5px solid',
                     borderColor: overviewDateFrom ? '#7c3aed' : '#e2e8f0',
@@ -3350,7 +3354,11 @@ export default function Dashboard() {
                 <input
                   type="date"
                   value={overviewDateTo}
-                  onChange={(e) => setOverviewDateTo(e.target.value)}
+                  onChange={(e) => {
+                    const newTo = e.target.value;
+                    setOverviewDateTo(newTo);
+                    if (overviewDateFrom && newTo) fetchMetaInsights("custom", overviewCampaignId, overviewDateFrom, newTo);
+                  }}
                   style={{
                     padding: '5px 10px', borderRadius: 20, border: '1.5px solid',
                     borderColor: overviewDateTo ? '#7c3aed' : '#e2e8f0',
