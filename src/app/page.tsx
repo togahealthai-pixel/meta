@@ -3303,8 +3303,6 @@ export default function Dashboard() {
       {tab === "overview" && (() => {
         // Compute dynamic top statistics
         const activeCampaigns = metaCampaignInsights.filter(c => c.effective_status === 'ACTIVE').length;
-        const totalCampaignsRendered = activeCampaigns || metaCampaignInsights.length; // fallback to total loaded
-        const pendingAuthCount = (adData?.ad_scripts || []).filter(a => getAdStatus(a.id) === "pending").length;
 
         // Determine Top Performer
         let topPerformer = null;
@@ -3417,11 +3415,11 @@ export default function Dashboard() {
             </div>
 
             {/* Top Stat Ribbon */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5">
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-4 mb-5">
               <MetricCard
                 label="Live campaigns"
-                value={totalCampaignsRendered}
-                sub="Meta Ads API"
+                value={activeCampaigns}
+                sub={activeCampaigns > 0 ? "Active on Meta" : "No active campaigns"}
                 color="var(--primary)"
                 bg="var(--primary-light)"
               />
@@ -3431,21 +3429,6 @@ export default function Dashboard() {
                 sub="Available reports"
                 color="var(--green)"
                 bg="var(--green-light)"
-              />
-              <MetricCard
-                label="Pending approval"
-                value={pendingAuthCount}
-                sub={pendingAuthCount > 0 ? "Action needed" : "All clear"}
-                color={pendingAuthCount > 0 ? "var(--red)" : "var(--amber)"}
-                bg={pendingAuthCount > 0 ? "var(--red-light)" : "var(--amber-light)"}
-                dot={pendingAuthCount > 0}
-              />
-              <MetricCard
-                label="Stopped"
-                value={stoppedIds.length}
-                sub="This session"
-                color="var(--text-muted)"
-                bg="var(--surface)"
               />
             </div>
 
