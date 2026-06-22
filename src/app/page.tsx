@@ -1267,8 +1267,13 @@ export default function Dashboard() {
       const data = await res.json();
       if (res.ok) {
         setMetaInsights(data.account || { spend: 0, impressions: 0, reach: 0, linkClicks: 0, inline_link_click_ctr: 0, leads: 0 });
-        setMetaCampaignInsights(data.campaigns || []);
-        if (!campaignId) setAllCampaignsList(data.campaigns || []);
+        const allCampaigns = data.campaigns || [];
+        // When a date range is active, only show campaigns that had activity (have insights) in that period
+        const filteredCampaigns = (dateFrom && dateTo)
+          ? allCampaigns.filter((c: any) => c.insights != null)
+          : allCampaigns;
+        setMetaCampaignInsights(filteredCampaigns);
+        if (!campaignId) setAllCampaignsList(allCampaigns);
       } else {
         setMetaReportsError(data.error || "Failed to fetch Meta insights");
       }
