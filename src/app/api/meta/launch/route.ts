@@ -274,7 +274,7 @@ async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCb
     campaign_id: campaignId,
     ...(!isCbo ? (budgetType === "DAILY" ? { daily_budget: dailyBudget } : { lifetime_budget: lifetimeBudget }) : {}),
     start_time: startTime,
-    ...(stopTime ? { stop_time: stopTime } : {}),
+    ...(stopTime ? { end_time: stopTime } : {}),
     billing_event: "IMPRESSIONS",
     optimization_goal: optimizationGoal,
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
