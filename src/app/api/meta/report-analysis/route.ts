@@ -78,6 +78,14 @@ function computeScore(spend: number, impressions: number, clicks: number, ctr: n
   return Math.max(5, Math.min(100, Math.round(ctrScore + clickBonus + cpmBonus)));
 }
 
+function scoreLabel(score: number): string {
+  if (score >= 80) return "Excellent";
+  if (score >= 60) return "Good";
+  if (score >= 40) return "Average";
+  if (score >= 20) return "Needs Work";
+  return "Critical";
+}
+
 // ── What is editable in Meta Ads after publishing ──
 const META_ADS_CONTEXT = `
 ## META ADS FUNDAMENTALS
@@ -242,7 +250,7 @@ export async function GET(req: NextRequest) {
       id: string; name: string; status: string; campaign_name: string; campaign_id: string;
       headline: string; body: string; cta: string; image_url: string; media_url: string;
       story: string; spend: number; impressions: number; clicks: number; ctr: number;
-      cpc: number; cpm: number; reach: number; frequency: number; score: number;
+      cpc: number; cpm: number; reach: number; frequency: number; score: number; score_label: string;
     }
 
     const VALID_STATUSES = ["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"];
@@ -264,7 +272,7 @@ export async function GET(req: NextRequest) {
         const clicks      = parseInt((ins.inline_link_clicks as string) || "0", 10);
         const ctr         = parseFloat((ins.inline_link_click_ctr as string) || "0");
         const cpm         = parseFloat((ins.cpm as string) || "0");
-        const cpc         = parseFloat((ins.cost_per_inline_link_click as string) || (ins.cpc as string) || "0");
+        const cpc         = clicks > 0 ? parseFloat((ins.cost_per_inline_link_click as string) || "0") : 0;
 
         return {
           id: ad.id as string,
@@ -282,6 +290,7 @@ export async function GET(req: NextRequest) {
           reach: parseInt((ins.reach as string) || "0", 10),
           frequency: parseFloat((ins.frequency as string) || "0"),
           score: computeScore(spend, impressions, clicks, ctr, cpm),
+          score_label: scoreLabel(computeScore(spend, impressions, clicks, ctr, cpm)),
         };
       });
 
@@ -315,10 +324,8 @@ export async function GET(req: NextRequest) {
     const totalImpressions = adsToDisplay.reduce((s, a) => s + a.impressions, 0);
     const totalClicks      = adsToDisplay.reduce((s, a) => s + a.clicks, 0);
     const avgCtr           = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    const cpmAds           = adsToDisplay.filter((a) => a.cpm > 0);
-    const avgCpm           = cpmAds.length > 0 ? cpmAds.reduce((s, a) => s + a.cpm, 0) / cpmAds.length : 0;
-    const cpcAds           = adsToDisplay.filter((a) => a.cpc > 0);
-    const avgCpc           = cpcAds.length > 0 ? cpcAds.reduce((s, a) => s + a.cpc, 0) / cpcAds.length : 0;
+    const avgCpm           = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+    const avgCpc           = totalClicks > 0 ? totalSpend / totalClicks : 0;
 
     const gptData = sorted.map((a) => ({
       id: a.id,
@@ -387,8 +394,10 @@ export async function GET(req: NextRequest) {
             : null,
           budget_suggestion: noDelivery
             ? "Set minimum $5/day budget and activate the campaign. Re-evaluate creative after 500 impressions."
-            : topPerformers.length > 0
+            : topPerformers.length > 0 && topPerformers[0].status === "ACTIVE"
             ? `Pause this ad. Redirect its daily budget to "${topPerformers[0].name}" which is already performing — fix the hook here first, then reactivate at $5/day.`
+            : topPerformers.length > 0
+            ? `Fix this ad's hook first. The top performer "${topPerformers[0].name}" is currently paused — unpause it before redirecting any budget to it.`
             : "Pause until hook is rewritten. Reactivate at $5/day after copy update.",
           url_suggestion: null,
         };
@@ -519,7 +528,8 @@ HARD RULES:
 - top_performer_notes: exactly ${topPerformers.length} entries
 - underperformer_suggestions: exactly ${underperformers.length} entries
 - Prefer null over generic advice — only fill a field when you have a specific, data-driven reason
-- Never invent data not present in the ads data above`;
+- Never invent data not present in the ads data above
+- Never recommend redirecting budget to a CAMPAIGN_PAUSED or ADSET_PAUSED ad — if the intended recipient is paused, recommend unpausing it first, not budget reallocation`;
 
     let ai: Record<string, unknown> = {};
     let aiError = "";
@@ -573,6 +583,7 @@ HARD RULES:
         avg_ctr: parseFloat(avgCtr.toFixed(2)),
         avg_cpm: parseFloat(avgCpm.toFixed(2)),
         avg_cpc: parseFloat(avgCpc.toFixed(2)),
+        score_methodology: "80–100 = Excellent | 60–79 = Good | 40–59 = Average | 20–39 = Needs Work | 5–19 = Critical",
       },
       top_performers: topPerformers,
       underperformers,
