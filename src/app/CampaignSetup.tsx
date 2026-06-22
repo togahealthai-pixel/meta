@@ -284,6 +284,7 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!hasGeo) errs.push("At least one Target Location is required.");
       const budget = config.ad_set?.budget_type === "DAILY" ? config.ad_set?.daily_budget : config.ad_set?.lifetime_budget;
       if (!budget || Number(budget) <= 0) errs.push("Budget amount must be greater than 0.");
+      if (config.ad_set?.budget_type === "LIFETIME" && !config.ad_set?.has_end_date) errs.push("Lifetime budget requires an End Date. Enable 'Has End Date' and set a date at least 24 hours after start.");
       if (!config.ad_set?.publish_immediately && !config.ad_set?.start_time) errs.push("Start Date is required. Or tick 'Post Immediately' to go live now.");
     }
     if (s === 3) {
