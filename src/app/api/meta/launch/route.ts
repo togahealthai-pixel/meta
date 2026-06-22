@@ -425,12 +425,22 @@ export async function POST(request) {
     const specialAdCats   = (campaign?.special_ad_categories || []).filter((c: string) => c && c !== "NONE");
     
     // Budget & Schedule
-    const budgetType      = ad_set?.budget_type       || "DAILY";
-    const dailyBudget     = ad_set?.daily_budget       || 5000;
-    const lifetimeBudget  = ad_set?.lifetime_budget    || 50000;
+    const budgetType      = ad_set?.budget_type       || "LIFETIME";
+    const dailyBudget     = ad_set?.daily_budget  > 0 ? ad_set.daily_budget  : 5000;
+    const lifetimeBudget  = ad_set?.lifetime_budget > 0 ? ad_set.lifetime_budget : 50000;
     const publishNow      = !!ad_set?.publish_immediately;
-    const startTime       = publishNow ? Math.floor(Date.now() / 1000) : (ad_set?.start_time || null);
-    const stopTime        = ad_set?.has_end_date ? ad_set?.stop_time : null;
+    const rawStartTime    = ad_set?.start_time;
+    const startTime       = publishNow
+      ? Math.floor(Date.now() / 1000)
+      : rawStartTime ? Math.floor(new Date(rawStartTime).getTime() / 1000) : null;
+    // Convert datetime-local string to Unix timestamp so Meta accepts it
+    const rawStopTime     = ad_set?.has_end_date ? ad_set?.stop_time : null;
+    const stopTime        = rawStopTime ? Math.floor(new Date(rawStopTime).getTime() / 1000) : null;
+
+    // API-side guard: lifetime budget requires a valid end date
+    if (budgetType === "LIFETIME" && !stopTime) {
+      return Response.json({ error: "Lifetime budget requires an end date. Please set an end date at least 24 hours after the start time." }, { status: 400 });
+    }
     const adStatus        = publishNow ? "ACTIVE" : "PAUSED";
 
     const adSetName       = ad_set?.name              || "Ad Set";
