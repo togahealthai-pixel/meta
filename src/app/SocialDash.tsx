@@ -645,6 +645,7 @@ export default function SocialDash() {
       {
         prompt: retryPrompt,
         text: retryPrompt,
+        previous_prompt: imagePrompt,
         ratio: imageRatio,
         aspect_ratio: imageRatio,
         is_retry: true,
