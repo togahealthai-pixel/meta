@@ -1273,7 +1273,7 @@ export default function Dashboard() {
           ? allCampaigns.filter((c: any) => c.insights != null)
           : allCampaigns;
         setMetaCampaignInsights(filteredCampaigns);
-        if (!campaignId) setAllCampaignsList(allCampaigns);
+        if (!campaignId) setAllCampaignsList(filteredCampaigns);
       } else {
         setMetaReportsError(data.error || "Failed to fetch Meta insights");
       }
