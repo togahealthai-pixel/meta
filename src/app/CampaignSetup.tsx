@@ -4,6 +4,36 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Spinner, Badge } from "./components";
 import CustomSelect from "./CustomSelect";
 
+// ─── TORONTO TIMEZONE HELPERS ────────────────────────────────────────────────
+// All date/time in this form is locked to America/Toronto regardless of user's browser timezone.
+
+/** Current Toronto time formatted as "YYYY-MM-DDTHH:MM" for datetime-local min attribute */
+const getTorontoNow = (): string =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Toronto" }).replace(" ", "T").slice(0, 16);
+
+/** Toronto UTC offset string e.g. "-04:00" (auto-handles DST: EDT vs EST) */
+const getTorontoOffset = (): string => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Toronto",
+    timeZoneName: "shortOffset",
+    hour: "numeric",
+  }).formatToParts(new Date());
+  const tz = parts.find(p => p.type === "timeZoneName")?.value || "GMT-4";
+  const m = tz.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  if (!m) return "-04:00";
+  return `${m[1]}${m[2].padStart(2, "0")}:${(m[3] || "0").padStart(2, "0")}`;
+};
+
+/** Convert stored value ("2026-06-23T04:02-04:00") → input display value ("2026-06-23T04:02") */
+const toDisplayVal = (stored: string): string => stored ? stored.slice(0, 16) : "";
+
+/** Convert input display value ("2026-06-23T04:02") → stored value with Toronto offset ("2026-06-23T04:02-04:00") */
+const toStoredVal = (display: string): string => display ? `${display}${getTorontoOffset()}` : "";
+
+/** Human-readable Toronto time e.g. "4:06 AM" */
+const torontoTimeLabel = (): string =>
+  new Date().toLocaleTimeString("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" });
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const normalizeSupabaseUrl = (url: string | null | undefined) => {
   if (!url || typeof url !== "string") return url;
@@ -618,13 +648,13 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                   </div>
                 </div>
 
-                <Label label="Start Date">
+                <Label label="Start Date (Toronto ET)">
                   <input
                     type="datetime-local"
-                    value={config.ad_set?.publish_immediately ? "" : (config.ad_set?.start_time || "")}
-                    onChange={e => setField("ad_set", "start_time", e.target.value)}
+                    value={config.ad_set?.publish_immediately ? "" : toDisplayVal(config.ad_set?.start_time || "")}
+                    onChange={e => setField("ad_set", "start_time", toStoredVal(e.target.value))}
                     disabled={!!config.ad_set?.publish_immediately}
-                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                    min={getTorontoNow()}
                     style={{
                       ...inputSt, width: "100%", boxSizing: "border-box",
                       opacity: config.ad_set?.publish_immediately ? 0.4 : 1,
@@ -633,17 +663,18 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                   />
                   {!config.ad_set?.publish_immediately && (
                     <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
-                      Now: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Must be a future time
+                      Toronto now: {torontoTimeLabel()} · Must be a future time
                     </div>
                   )}
                 </Label>
-                <Label label="End Date">
+                <Label label="End Date (Toronto ET)">
                   {config.ad_set?.has_end_date ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input
                         type="datetime-local"
-                        value={config.ad_set?.stop_time || ""}
-                        onChange={e => setField("ad_set", "stop_time", e.target.value)}
+                        value={toDisplayVal(config.ad_set?.stop_time || "")}
+                        onChange={e => setField("ad_set", "stop_time", toStoredVal(e.target.value))}
+                        min={config.ad_set?.start_time ? toDisplayVal(config.ad_set.start_time) : getTorontoNow()}
                         style={{ ...inputSt, flex: 1, boxSizing: "border-box" }}
                       />
                       <button
