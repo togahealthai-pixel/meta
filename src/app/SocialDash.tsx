@@ -703,8 +703,6 @@ export default function SocialDash() {
           linkedin: liText,
           twitter: twText
         });
-        // Auto-refresh image preview from Supabase after successful retry
-        setTimeout(() => handleRefreshImagePreview(), 1500);
       } catch (err) {
         console.error("Error parsing webhook social data in retry:", err);
       } finally {

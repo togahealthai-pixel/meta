@@ -6008,11 +6008,21 @@ export default function Dashboard() {
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>ID: {campaign.id}</div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{campaign.objective}</div>
                   </div>
-                  <Badge
-                    text={campaign.effective_status}
-                    color={campaign.effective_status === "ACTIVE" ? "var(--green)" : "var(--amber)"}
-                    bg={campaign.effective_status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"}
-                  />
+                  {(() => {
+                    const now = Date.now();
+                    const allScheduled = campaign.effective_status === "ACTIVE" &&
+                      (campaign.adsets?.data || []).length > 0 &&
+                      (campaign.adsets?.data || []).every((as: any) =>
+                        as.effective_status === "ACTIVE" && as.start_time && new Date(as.start_time).getTime() > now
+                      );
+                    return (
+                      <Badge
+                        text={allScheduled ? "SCHEDULED" : campaign.effective_status}
+                        color={allScheduled ? "#2563eb" : campaign.effective_status === "ACTIVE" ? "var(--green)" : "var(--amber)"}
+                        bg={allScheduled ? "#eff6ff" : campaign.effective_status === "ACTIVE" ? "var(--green-light)" : "var(--amber-light)"}
+                      />
+                    );
+                  })()}
                 </div>
                 {/* Bottom row: action buttons */}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 26 }} onClick={(e) => e.stopPropagation()}>
@@ -6049,11 +6059,16 @@ export default function Dashboard() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 12, color: "var(--primary)", transition: "transform 0.2s", transform: expandedAdSets.has(adset.id) ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }}>▶</span>
                           <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{adset.name}</span>
-                          <Badge
-                            text={adset.effective_status === "IN_PROCESS" ? "Reviewing..." : adset.effective_status}
-                            color={adset.effective_status === "ACTIVE" ? "var(--green)" : adset.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
-                            bg={adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
-                          />
+                          {(() => {
+                            const isAdsetScheduled = adset.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > Date.now();
+                            return (
+                              <Badge
+                                text={isAdsetScheduled ? "SCHEDULED" : adset.effective_status === "IN_PROCESS" ? "Reviewing..." : adset.effective_status}
+                                color={isAdsetScheduled ? "#2563eb" : adset.effective_status === "ACTIVE" ? "var(--green)" : adset.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
+                                bg={isAdsetScheduled ? "#eff6ff" : adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
+                              />
+                            );
+                          })()}
                         </div>
                         {/* Budget & Schedule info row */}
                         {(() => {
