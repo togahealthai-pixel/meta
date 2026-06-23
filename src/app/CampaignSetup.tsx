@@ -286,9 +286,11 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!budget || Number(budget) <= 0) errs.push("Budget amount must be greater than 0.");
       if (config.ad_set?.budget_type === "LIFETIME" && !config.ad_set?.has_end_date) errs.push("Lifetime budget requires an End Date. Enable 'Has End Date' and set a date at least 24 hours after start.");
       if (config.ad_set?.budget_type === "LIFETIME" && config.ad_set?.has_end_date && config.ad_set?.stop_time) {
-        const startMs = config.ad_set?.publish_immediately ? Date.now() : (config.ad_set?.start_time ? new Date(config.ad_set.start_time).getTime() : Date.now());
-        const endMs = new Date(config.ad_set.stop_time).getTime();
-        const days = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)));
+        const startRaw = config.ad_set?.publish_immediately ? new Date() : (config.ad_set?.start_time ? new Date(config.ad_set.start_time) : new Date());
+        const startDay = new Date(startRaw.getFullYear(), startRaw.getMonth(), startRaw.getDate());
+        const endRaw = new Date(config.ad_set.stop_time);
+        const endDay = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate());
+        const days = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)));
         const minBudgetCents = Math.max(300, days * 100);
         const minDollars = (minBudgetCents / 100).toFixed(2);
         if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${minDollars} for a ${days}-day campaign. Please increase the budget.`);
