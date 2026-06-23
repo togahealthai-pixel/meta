@@ -284,14 +284,14 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!hasGeo) errs.push("At least one Target Location is required.");
       const budget = config.ad_set?.budget_type === "DAILY" ? config.ad_set?.daily_budget : config.ad_set?.lifetime_budget;
       if (!budget || Number(budget) <= 0) errs.push("Budget amount must be greater than 0.");
-      if (config.ad_set?.budget_type === "LIFETIME" && Number(config.ad_set?.lifetime_budget) < 300) errs.push("Lifetime budget must be more than $3.00 to meet Meta's minimum requirement.");
       if (config.ad_set?.budget_type === "LIFETIME" && !config.ad_set?.has_end_date) errs.push("Lifetime budget requires an End Date. Enable 'Has End Date' and set a date at least 24 hours after start.");
       if (config.ad_set?.budget_type === "LIFETIME" && config.ad_set?.has_end_date && config.ad_set?.stop_time) {
         const startMs = config.ad_set?.publish_immediately ? Date.now() : (config.ad_set?.start_time ? new Date(config.ad_set.start_time).getTime() : Date.now());
         const endMs = new Date(config.ad_set.stop_time).getTime();
         const days = Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)));
-        const minBudgetCents = days * 100; // $1 per day minimum
-        if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${days} for a ${days}-day campaign ($1/day). Please increase the budget.`);
+        const minBudgetCents = Math.max(300, days * 100);
+        const minDollars = (minBudgetCents / 100).toFixed(2);
+        if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${minDollars} for a ${days}-day campaign. Please increase the budget.`);
       }
       if (!config.ad_set?.publish_immediately && !config.ad_set?.start_time) errs.push("Start Date is required. Or tick 'Post Immediately' to go live now.");
     }
