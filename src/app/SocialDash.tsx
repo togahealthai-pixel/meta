@@ -637,7 +637,7 @@ export default function SocialDash() {
     setIsImageGenerating(true);
     setGeneratedSocialImage(null);
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_IMAGE_URL || "https://n8n.srv1208919.hstgr.cloud/webhook/1703fb64-ec58-4e56-9ce7-bd9e16e15220";
+    const webhookUrl = "https://n8n.srv1208919.hstgr.cloud/webhook/40fe1e56-2ab7-4e38-9bf4-9cbdf4bd7fd4";
     const result = await triggerWebhook(
       webhookUrl,
       "images",
@@ -650,7 +650,10 @@ export default function SocialDash() {
         aspect_ratio: imageRatio,
         is_retry: true,
         status: "Reject",
-        previous_image: generatedSocialImage
+        image_link: supabaseImageUrl || generatedSocialImage,
+        previous_image: generatedSocialImage,
+        descriptions: socialDescriptions,
+        supabase_description: supabaseDescription,
       },
       "POST"
     );
