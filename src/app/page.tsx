@@ -3308,8 +3308,22 @@ export default function Dashboard() {
           OVERVIEW
       ═══════════════════════════════════════════════════════ */}
       {tab === "overview" && (() => {
-        // Compute dynamic top statistics
-        const activeCampaigns = metaCampaignInsights.filter(c => c.effective_status === 'ACTIVE').length;
+        // Compute dynamic top statistics — exclude campaigns where all ad sets are still scheduled
+        const now = Date.now();
+        const scheduledCampaignIds = new Set(
+          liveCampaigns
+            .filter((c: any) =>
+              c.effective_status === "ACTIVE" &&
+              (c.adsets?.data || []).length > 0 &&
+              (c.adsets?.data || []).every((as: any) =>
+                as.effective_status === "ACTIVE" && as.start_time && new Date(as.start_time).getTime() > now
+              )
+            )
+            .map((c: any) => c.id)
+        );
+        const activeCampaigns = metaCampaignInsights.filter(
+          (c: any) => c.effective_status === 'ACTIVE' && !scheduledCampaignIds.has(c.id)
+        ).length;
 
         // Determine Top Performer
         let topPerformer = null;
@@ -6142,11 +6156,16 @@ export default function Dashboard() {
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                                       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ad.name}</div>
-                                      <Badge
-                                        text={ad.effective_status === "IN_PROCESS" ? "Reviewing..." : ad.effective_status}
-                                        color={ad.effective_status === "ACTIVE" ? "var(--green)" : ad.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
-                                        bg={ad.effective_status === "ACTIVE" ? "var(--green-light)" : ad.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
-                                      />
+                                      {(() => {
+                                        const isAdScheduled = ad.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > Date.now();
+                                        return (
+                                          <Badge
+                                            text={isAdScheduled ? "SCHEDULED" : ad.effective_status === "IN_PROCESS" ? "Reviewing..." : ad.effective_status}
+                                            color={isAdScheduled ? "#2563eb" : ad.effective_status === "ACTIVE" ? "var(--green)" : ad.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
+                                            bg={isAdScheduled ? "#eff6ff" : ad.effective_status === "ACTIVE" ? "var(--green-light)" : ad.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
+                                          />
+                                        );
+                                      })()}
                                     </div>
                                     <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>ID: {ad.id}</div>
                                   </div>

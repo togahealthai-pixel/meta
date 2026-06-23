@@ -33,6 +33,29 @@ export async function GET(request: Request) {
     const ads: Record<string, unknown>[] = adsData.data || [];
     if (ads.length === 0) return NextResponse.json({ ads: [] });
 
+    // Fetch adset start_times to filter out scheduled (not-yet-delivering) ads
+    const adsetIds = [...new Set(ads.map((ad) => ad.adset_id as string))];
+    const adsetChunks: string[][] = [];
+    for (let i = 0; i < adsetIds.length; i += 50) adsetChunks.push(adsetIds.slice(i, i + 50));
+    const adsetMap = new Map<string, string>();
+    await Promise.all(
+      adsetChunks.map(async (chunk) => {
+        const ids = chunk.join(",");
+        const res = await fetch(`${GRAPH}/?ids=${ids}&fields=id,start_time&access_token=${token}`);
+        const data = await res.json();
+        for (const [id, obj] of Object.entries(data as Record<string, Record<string, unknown>>)) {
+          if (obj.start_time) adsetMap.set(id, obj.start_time as string);
+        }
+      })
+    );
+    const now = Date.now();
+    const deliveringAds = ads.filter((ad) => {
+      const st = adsetMap.get(ad.adset_id as string);
+      return !st || new Date(st).getTime() <= now;
+    });
+
+    if (deliveringAds.length === 0) return NextResponse.json({ ads: [] });
+
     // Fetch insights for these ads (last 30 days)
     const insightFields = "ad_id,spend,impressions,inline_link_clicks,inline_link_click_ctr,cpm,cpc";
     const insUrl = `${GRAPH}/act_${account}/insights?level=ad&fields=${insightFields}&date_preset=maximum&limit=200&access_token=${token}`;
@@ -50,7 +73,7 @@ export async function GET(request: Request) {
       ((campData.data || []) as Record<string, unknown>[]).map((c) => [c.id as string, c.name as string])
     );
 
-    const result = ads.map((ad) => {
+    const result = deliveringAds.map((ad) => {
       const ins = insightMap.get(ad.id as string) || {};
       const creative = (ad.creative as Record<string, unknown>) || {};
       return {
