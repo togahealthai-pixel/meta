@@ -441,7 +441,9 @@ export async function POST(request) {
     if (budgetType === "LIFETIME" && !stopTime) {
       return Response.json({ error: "Lifetime budget requires an end date. Please set an end date at least 24 hours after the start time." }, { status: 400 });
     }
-    const adStatus        = publishNow ? "ACTIVE" : "PAUSED";
+    // Always ACTIVE: Meta auto-starts scheduled campaigns at start_time when status=ACTIVE.
+    // PAUSED campaigns are never auto-activated by Meta regardless of start_time.
+    const adStatus        = "ACTIVE";
 
     const adSetName       = ad_set?.name              || "Ad Set";
     const ageMin          = ad_set?.age_min            || 18;

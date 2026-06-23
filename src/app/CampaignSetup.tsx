@@ -284,6 +284,10 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!hasGeo) errs.push("At least one Target Location is required.");
       const budget = config.ad_set?.budget_type === "DAILY" ? config.ad_set?.daily_budget : config.ad_set?.lifetime_budget;
       if (!budget || Number(budget) <= 0) errs.push("Budget amount must be greater than 0.");
+      // Daily budget: Meta enforces $1/day minimum (100 cents)
+      if (config.ad_set?.budget_type === "DAILY" && Number(budget) > 0 && Number(budget) < 100) {
+        errs.push("Daily budget too low. Minimum is $1.00 per day.");
+      }
       if (config.ad_set?.budget_type === "LIFETIME" && !config.ad_set?.has_end_date) errs.push("Lifetime budget requires an End Date. Enable 'Has End Date' and set a date at least 24 hours after start.");
       if (config.ad_set?.budget_type === "LIFETIME" && config.ad_set?.has_end_date && config.ad_set?.stop_time) {
         const startRaw = config.ad_set?.publish_immediately ? new Date() : (config.ad_set?.start_time ? new Date(config.ad_set.start_time) : new Date());
@@ -291,7 +295,8 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
         const endRaw = new Date(config.ad_set.stop_time);
         const endDay = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate());
         const days = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)));
-        const minBudgetCents = Math.max(300, days * 100);
+        // Meta minimum: $1/day, absolute floor $2 (matches Meta's actual enforcement ~$2.15)
+        const minBudgetCents = Math.max(200, days * 100);
         const minDollars = (minBudgetCents / 100).toFixed(2);
         if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${minDollars} for a ${days}-day campaign. Please increase the budget.`);
       }
@@ -615,6 +620,7 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                     value={config.ad_set?.publish_immediately ? "" : (config.ad_set?.start_time || "")}
                     onChange={e => setField("ad_set", "start_time", e.target.value)}
                     disabled={!!config.ad_set?.publish_immediately}
+                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                     style={{
                       ...inputSt, width: "100%", boxSizing: "border-box",
                       opacity: config.ad_set?.publish_immediately ? 0.4 : 1,
