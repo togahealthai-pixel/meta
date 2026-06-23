@@ -488,11 +488,6 @@ export async function POST(request) {
       cleanGeo.countries = ["US"];
     }
 
-    // EU countries require DSA fields — only include them when targeting EU
-    const EU_COUNTRIES = new Set(["AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"]);
-    const targetedCountries: string[] = cleanGeo.countries || [];
-    const isEuTargeted = targetedCountries.some((c: string) => EU_COUNTRIES.has(c));
-
     const targeting: any = {
       geo_locations: cleanGeo,
       age_min: ageMin,
@@ -503,10 +498,11 @@ export async function POST(request) {
       },
     };
 
-    const dsaFields = isEuTargeted ? {
+    // Meta enforces DSA transparency fields on all ACTIVE ads globally (not just EU)
+    const dsaFields = {
       dsa_beneficiary: dsaBeneficiary,
       dsa_payor: dsaPayor,
-    } : {};
+    };
 
     // Dynamic Optimization Goal and Pixel requirements
     const userGoal = ad_set?.optimization_goal || "LINK_CLICKS";
