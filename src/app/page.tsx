@@ -573,6 +573,8 @@ export default function Dashboard() {
   const [researchCountries, setResearchCountries] = useLocalStorage("toga_research_countries", ["CA", "US"]);
   const [locationSearchInput, setLocationSearchInput] = useState("");
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationInputRef = useRef<HTMLDivElement>(null);
+  const [locationDropPos, setLocationDropPos] = useState({ top: 0, left: 0, width: 0 });
   const [researchMaxAds, setResearchMaxAds] = useLocalStorage("toga_research_max_ads", 100);
   const [researchOnlyActive, setResearchOnlyActive] = useLocalStorage("toga_research_only_active", true);
   const [researchSort, setResearchSort] = useLocalStorage("toga_research_sort", "Impressions High → Low");
@@ -3909,7 +3911,7 @@ export default function Dashboard() {
                   }}
                 >
                   {/* Google Maps Country Search Autocomplete */}
-                  <div style={{ position: "relative" }} onMouseLeave={() => setShowLocationDropdown(false)}>
+                  <div ref={locationInputRef} style={{ position: "relative" }} onMouseLeave={() => setShowLocationDropdown(false)}>
                     <label
                       style={{
                         display: "block",
@@ -3935,9 +3937,19 @@ export default function Dashboard() {
                         value={locationSearchInput}
                         onChange={(e) => {
                           setLocationSearchInput(e.target.value);
+                          if (locationInputRef.current) {
+                            const r = locationInputRef.current.getBoundingClientRect();
+                            setLocationDropPos({ top: r.bottom + 4, left: r.left, width: r.width });
+                          }
                           setShowLocationDropdown(true);
                         }}
-                        onFocus={() => setShowLocationDropdown(true)}
+                        onFocus={() => {
+                          if (locationInputRef.current) {
+                            const r = locationInputRef.current.getBoundingClientRect();
+                            setLocationDropPos({ top: r.bottom + 4, left: r.left, width: r.width });
+                          }
+                          setShowLocationDropdown(true);
+                        }}
                         style={{
                           width: "100%",
                           padding: "8px 12px 8px 30px",
@@ -3982,18 +3994,17 @@ export default function Dashboard() {
                     {showLocationDropdown && (
                       <div
                         style={{
-                          position: "absolute",
-                          top: "100%",
-                          left: 0,
-                          right: 0,
-                          zIndex: 50,
+                          position: "fixed",
+                          top: locationDropPos.top,
+                          left: locationDropPos.left,
+                          width: locationDropPos.width,
+                          zIndex: 9999,
                           background: "var(--card-bg)",
                           border: "1px solid var(--border)",
                           borderRadius: "var(--radius-md)",
                           boxShadow: "var(--shadow-lg)",
                           maxHeight: 200,
                           overflowY: "auto",
-                          marginTop: 4,
                         }}
                       >
                         {LOCATION_SUGGESTIONS.filter(item =>

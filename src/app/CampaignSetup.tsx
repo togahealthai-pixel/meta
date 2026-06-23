@@ -1085,6 +1085,15 @@ function LocationSearch({ geoLocations, onChange }: LocationSearchProps) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const inputRef = useRef<HTMLDivElement>(null);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const openDropdown = () => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    setShowDropdown(true);
+  };
 
   // Build pills from countries, cities, and regions
   const selectedPills: any[] = [];
@@ -1112,7 +1121,7 @@ function LocationSearch({ geoLocations, onChange }: LocationSearchProps) {
       try {
         const res = await fetch(`/api/meta/locations?q=${encodeURIComponent(query)}`);
         const data = await res.json();
-        setResults(data || []); setShowDropdown(true);
+        setResults(data || []); if ((data || []).length > 0) openDropdown();
       } catch {} finally { setLoading(false); }
     }, 400);
     return () => clearTimeout(t);
@@ -1177,13 +1186,13 @@ function LocationSearch({ geoLocations, onChange }: LocationSearchProps) {
 
   return (
     <div style={{ position: "relative" }}>
-      <div style={{ position: "relative" }}>
-        <input value={query} onChange={e => setQuery(e.target.value)} onFocus={() => results.length > 0 && setShowDropdown(true)} onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+      <div ref={inputRef} style={{ position: "relative" }}>
+        <input value={query} onChange={e => setQuery(e.target.value)} onFocus={() => results.length > 0 && openDropdown()} onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
           placeholder="Search countries, cities, regions..." style={{ ...inputSt, paddingRight: 36 }} />
         {loading && <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}><Spinner size={13} /></div>}
       </div>
       {showDropdown && results.length > 0 && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 50, maxHeight: 320, overflowY: "auto" }}>
+        <div style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 9999, maxHeight: 320, overflowY: "auto" }}>
           {results.map((r: any) => (
             <div key={r.key} onMouseDown={e => { e.preventDefault(); handleSelect(r); }}
               style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #f1f5f9", fontSize: 13 }}
