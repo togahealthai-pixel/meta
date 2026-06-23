@@ -11,7 +11,7 @@ export async function GET() {
   }
 
   try {
-    const fields = "id,name,status,effective_status,objective,adsets{id,name,status,effective_status,ads{id,name,status,effective_status,creative{id,thumbnail_url},insights.date_preset(maximum){spend,inline_link_click_ctr,clicks,impressions,actions}}}";
+    const fields = "id,name,status,effective_status,objective,daily_budget,lifetime_budget,adsets{id,name,status,effective_status,daily_budget,lifetime_budget,start_time,end_time,ads{id,name,status,effective_status,creative{id,thumbnail_url},insights.date_preset(maximum){spend,inline_link_click_ctr,clicks,impressions,actions}}}";
     const response = await fetch(
       `https://graph.facebook.com/v21.0/act_${adAccountId}/campaigns?fields=${fields}&limit=50&access_token=${accessToken}`
     );

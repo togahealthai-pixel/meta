@@ -6055,6 +6055,41 @@ export default function Dashboard() {
                             bg={adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
                           />
                         </div>
+                        {/* Budget & Schedule info row */}
+                        {(() => {
+                          const isDaily = adset.daily_budget && Number(adset.daily_budget) > 0;
+                          const isLifetime = adset.lifetime_budget && Number(adset.lifetime_budget) > 0;
+                          const budgetType = isDaily ? "Daily" : isLifetime ? "Lifetime" : null;
+                          const budgetAmt = isDaily
+                            ? `$${(Number(adset.daily_budget) / 100).toFixed(2)}/day`
+                            : isLifetime
+                            ? `$${(Number(adset.lifetime_budget) / 100).toFixed(2)} total`
+                            : null;
+                          const fmtDate = (iso: string) => iso
+                            ? new Date(iso).toLocaleString("en-CA", { timeZone: "America/Toronto", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                            : null;
+                          const startLabel = fmtDate(adset.start_time);
+                          const endLabel = fmtDate(adset.end_time);
+                          if (!budgetType && !startLabel) return null;
+                          return (
+                            <div style={{ paddingLeft: 20, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                              {budgetType && (
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: isDaily ? "#eff6ff" : "#f5f3ff", color: isDaily ? "#1d4ed8" : "#7c3aed", border: `1px solid ${isDaily ? "#bfdbfe" : "#ddd6fe"}` }}>
+                                  {budgetType}
+                                </span>
+                              )}
+                              {budgetAmt && (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text)" }}>{budgetAmt}</span>
+                              )}
+                              {startLabel && (
+                                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>▶ {startLabel}</span>
+                              )}
+                              {endLabel && (
+                                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>⏹ {endLabel}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {adset.effective_status === "IN_PROCESS" && (
                           <div style={{ paddingLeft: 20, fontSize: 11, color: "#7c3aed", display: "flex", alignItems: "center", gap: 5 }}>
                             <span>⏳</span> Meta is reviewing this ad set — will go live automatically in a few minutes. No action needed.
