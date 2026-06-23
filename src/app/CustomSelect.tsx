@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface Option { value: string; label: string }
 
@@ -90,14 +91,14 @@ export default function CustomSelect({ value, onChange, options, style }: Custom
         </svg>
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
           {/* Invisible backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 9998 }}
             onMouseDown={() => setOpen(false)}
           />
-          {/* Dropdown list — fixed, clamped to viewport */}
+          {/* Dropdown list — portaled to document.body, bypasses all ancestor overflow/transform */}
           <div
             style={{
               position: "fixed",
@@ -136,7 +137,8 @@ export default function CustomSelect({ value, onChange, options, style }: Custom
               </div>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
