@@ -301,6 +301,10 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
         if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${minDollars} for a ${days}-day campaign. Please increase the budget.`);
       }
       if (!config.ad_set?.publish_immediately && !config.ad_set?.start_time) errs.push("Start Date is required. Or tick 'Post Immediately' to go live now.");
+      if (!config.ad_set?.publish_immediately && config.ad_set?.start_time) {
+        const chosen = new Date(config.ad_set.start_time).getTime();
+        if (chosen < Date.now()) errs.push("Start Date cannot be in the past. Please select a future date and time.");
+      }
     }
     if (s === 3) {
       if (!config.ad?.name?.trim()) errs.push("Ad Name is required.");
@@ -627,6 +631,11 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                       cursor: config.ad_set?.publish_immediately ? "not-allowed" : "text",
                     }}
                   />
+                  {!config.ad_set?.publish_immediately && (
+                    <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>
+                      Now: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Must be a future time
+                    </div>
+                  )}
                 </Label>
                 <Label label="End Date">
                   {config.ad_set?.has_end_date ? (
