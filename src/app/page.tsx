@@ -6611,7 +6611,7 @@ export default function Dashboard() {
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Spend</th>
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Impr.</th>
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>CTR</th>
-                          <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Leads</th>
+                          <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Clicks</th>
                           <th style={{ padding: "12px 20px", textAlign: "center", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Actions</th>
                         </tr>
                       </thead>
@@ -6641,7 +6641,7 @@ export default function Dashboard() {
                                 {parseFloat(ins.inline_link_click_ctr || 0).toFixed(2)}%
                               </td>
                               <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600 }}>
-                                {parseFloat(ins.leads || "0").toLocaleString()}
+                                {parseFloat(ins.clicks || "0").toLocaleString()}
                               </td>
                               <td style={{ padding: "16px 20px", textAlign: "center" }}>
                                 <button
