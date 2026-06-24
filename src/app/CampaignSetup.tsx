@@ -611,6 +611,41 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                       }}
                     />
                   </div>
+                  {(() => {
+                    const type = config.ad_set?.budget_type;
+                    if (type === "DAILY") {
+                      const val = config.ad_set?.daily_budget || 0;
+                      const isError = val > 0 && val < 100;
+                      return (
+                        <div style={{ fontSize: 11, color: isError ? "#dc2626" : "#94a3b8", fontWeight: 500 }}>
+                          {isError ? "Too low — minimum is $1.00/day. Please enter at least $1.00." : "Min. $1.00/day"}
+                        </div>
+                      );
+                    }
+                    if (type === "LIFETIME") {
+                      const stopTime = config.ad_set?.stop_time;
+                      if (!stopTime) return (
+                        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>Min. $3.00+ (set an end date to see exact minimum)</div>
+                      );
+                      const startRaw = config.ad_set?.publish_immediately ? new Date() : (config.ad_set?.start_time ? new Date(config.ad_set.start_time) : new Date());
+                      const startDay = new Date(startRaw.getFullYear(), startRaw.getMonth(), startRaw.getDate());
+                      const endRaw = new Date(stopTime);
+                      const endDay = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate());
+                      const days = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)));
+                      const minCents = (days + 2) * 100;
+                      const minDollars = (minCents / 100).toFixed(2);
+                      const val = config.ad_set?.lifetime_budget || 0;
+                      const isError = val > 0 && val < minCents;
+                      return (
+                        <div style={{ fontSize: 11, color: isError ? "#dc2626" : "#94a3b8", fontWeight: 500 }}>
+                          {isError
+                            ? `Too low — minimum is $${minDollars} for ${days} day${days !== 1 ? "s" : ""}. Please enter at least $${minDollars}.`
+                            : `Min. $${minDollars} for ${days} day${days !== 1 ? "s" : ""}`}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </Label>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
