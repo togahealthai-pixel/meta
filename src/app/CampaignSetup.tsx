@@ -325,8 +325,8 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
         const endRaw = new Date(config.ad_set.stop_time);
         const endDay = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate());
         const days = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)));
-        // Meta minimum: $1/day, absolute floor $2 (matches Meta's actual enforcement ~$2.15)
-        const minBudgetCents = Math.max(200, days * 100);
+        // Meta official minimum: $3 for 1 day, +$1 per additional day
+        const minBudgetCents = (days + 2) * 100;
         const minDollars = (minBudgetCents / 100).toFixed(2);
         if (Number(budget) < minBudgetCents) errs.push(`Lifetime budget too low. Minimum is $${minDollars} for a ${days}-day campaign. Please increase the budget.`);
       }
