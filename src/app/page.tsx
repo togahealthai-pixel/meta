@@ -4030,7 +4030,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Autocomplete Dropdown list */}
-                    {showLocationDropdown && (
+                    {showLocationDropdown && createPortal(
                       <div
                         style={{
                           position: "fixed",
@@ -4084,7 +4084,8 @@ export default function Dashboard() {
                             </span>
                           </div>
                         ))}
-                      </div>
+                      </div>,
+                      document.body
                     )}
 
                     {/* Selected Countries Location Pin Badges */}

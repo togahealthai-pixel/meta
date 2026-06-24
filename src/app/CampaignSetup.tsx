@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Spinner, Badge } from "./components";
 import CustomSelect from "./CustomSelect";
 
@@ -1272,7 +1273,7 @@ function LocationSearch({ geoLocations, onChange }: LocationSearchProps) {
           placeholder="Search countries, cities, regions..." style={{ ...inputSt, paddingRight: 36 }} />
         {loading && <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}><Spinner size={13} /></div>}
       </div>
-      {showDropdown && results.length > 0 && (
+      {showDropdown && results.length > 0 && createPortal(
         <div style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.1)", zIndex: 9999, maxHeight: 320, overflowY: "auto" }}>
           {results.map((r: any) => (
             <div key={r.key} onMouseDown={e => { e.preventDefault(); handleSelect(r); }}
@@ -1283,7 +1284,8 @@ function LocationSearch({ geoLocations, onChange }: LocationSearchProps) {
               <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{r.type?.toUpperCase()} · {r.country_name || r.country_code}</div>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
       {selectedPills.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
