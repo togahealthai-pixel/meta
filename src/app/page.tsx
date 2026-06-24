@@ -1600,6 +1600,31 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [liveCampaigns, tab, fetchLiveCampaigns]);
 
+  // Auto-pause adsets on Meta when end_time passed, lifetime budget exhausted, or daily budget exhausted
+  useEffect(() => {
+    if (!liveCampaigns || liveCampaigns.length === 0) return;
+    const now = Date.now();
+    liveCampaigns.forEach((campaign: any) => {
+      (campaign.adsets?.data || []).forEach((adset: any) => {
+        if (adset.effective_status !== "ACTIVE") return;
+        const isExpired = adset.end_time && new Date(adset.end_time).getTime() < now;
+        const lifetimeBudget = Number(adset.lifetime_budget || 0);
+        const totalSpend = (adset.ads?.data || []).reduce((s: number, a: any) => s + parseFloat(a.insights?.data?.[0]?.spend || "0"), 0);
+        const isLifetimeExhausted = lifetimeBudget > 0 && Math.round(totalSpend * 100) >= lifetimeBudget;
+        const todaySpend = parseFloat(adset.insights?.data?.[0]?.spend || "0");
+        const dailyBudget = Number(adset.daily_budget || 0);
+        const isDailyExhausted = dailyBudget > 0 && Math.round(todaySpend * 100) >= dailyBudget;
+        if (isExpired || isLifetimeExhausted || isDailyExhausted) {
+          fetch("/api/meta/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: adset.id, status: "PAUSED", action: "pause" }),
+          }).catch(() => {});
+        }
+      });
+    });
+  }, [liveCampaigns]);
+
   // ── Polling workflow status from Supabase status_table (id: 1) ──
   useEffect(() => {
     let interval;
@@ -6074,14 +6099,20 @@ export default function Dashboard() {
                           <span style={{ fontSize: 12, color: "var(--primary)", transition: "transform 0.2s", transform: expandedAdSets.has(adset.id) ? "rotate(90deg)" : "rotate(0deg)", flexShrink: 0 }}>▶</span>
                           <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{adset.name}</span>
                           {(() => {
-                            const isAdsetScheduled = adset.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > Date.now();
-                            return (
-                              <Badge
-                                text={isAdsetScheduled ? "SCHEDULED" : adset.effective_status === "IN_PROCESS" ? "Reviewing..." : adset.effective_status}
-                                color={isAdsetScheduled ? "#2563eb" : adset.effective_status === "ACTIVE" ? "var(--green)" : adset.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
-                                bg={isAdsetScheduled ? "#eff6ff" : adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
-                              />
-                            );
+                            const now = Date.now();
+                            const isScheduled = adset.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > now;
+                            const isExpired = adset.effective_status === "ACTIVE" && adset.end_time && new Date(adset.end_time).getTime() < now;
+                            const lifetimeBudget = Number(adset.lifetime_budget || 0);
+                            const dailyBudget = Number(adset.daily_budget || 0);
+                            const totalSpend = (adset.ads?.data || []).reduce((s: number, a: any) => s + parseFloat(a.insights?.data?.[0]?.spend || "0"), 0);
+                            const todaySpend = parseFloat(adset.insights?.data?.[0]?.spend || "0");
+                            const isLifetimeExhausted = lifetimeBudget > 0 && Math.round(totalSpend * 100) >= lifetimeBudget;
+                            const isDailyExhausted = dailyBudget > 0 && Math.round(todaySpend * 100) >= dailyBudget;
+                            const isCompleted = isExpired || isLifetimeExhausted;
+                            const text = isScheduled ? "SCHEDULED" : isCompleted ? "Completed" : isDailyExhausted ? "Daily Budget End" : adset.effective_status === "IN_PROCESS" ? "Reviewing..." : adset.effective_status;
+                            const color = isScheduled ? "#2563eb" : isCompleted ? "#64748b" : isDailyExhausted ? "#d97706" : adset.effective_status === "ACTIVE" ? "var(--green)" : adset.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)";
+                            const bg = isScheduled ? "#eff6ff" : isCompleted ? "#f1f5f9" : isDailyExhausted ? "#fffbeb" : adset.effective_status === "ACTIVE" ? "var(--green-light)" : adset.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)";
+                            return <Badge text={text} color={color} bg={bg} />;
                           })()}
                         </div>
                         {/* Budget & Schedule info row */}
@@ -6157,14 +6188,20 @@ export default function Dashboard() {
                                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                                       <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ad.name}</div>
                                       {(() => {
-                                        const isAdScheduled = ad.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > Date.now();
-                                        return (
-                                          <Badge
-                                            text={isAdScheduled ? "SCHEDULED" : ad.effective_status === "IN_PROCESS" ? "Reviewing..." : ad.effective_status}
-                                            color={isAdScheduled ? "#2563eb" : ad.effective_status === "ACTIVE" ? "var(--green)" : ad.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)"}
-                                            bg={isAdScheduled ? "#eff6ff" : ad.effective_status === "ACTIVE" ? "var(--green-light)" : ad.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)"}
-                                          />
-                                        );
+                                        const now = Date.now();
+                                        const isAdScheduled = ad.effective_status === "ACTIVE" && adset.start_time && new Date(adset.start_time).getTime() > now;
+                                        const isAdExpired = ad.effective_status === "ACTIVE" && adset.end_time && new Date(adset.end_time).getTime() < now;
+                                        const lifetimeBudget = Number(adset.lifetime_budget || 0);
+                                        const dailyBudget = Number(adset.daily_budget || 0);
+                                        const totalSpend = (adset.ads?.data || []).reduce((s: number, a: any) => s + parseFloat(a.insights?.data?.[0]?.spend || "0"), 0);
+                                        const todaySpend = parseFloat(adset.insights?.data?.[0]?.spend || "0");
+                                        const isLifetimeExhausted = lifetimeBudget > 0 && Math.round(totalSpend * 100) >= lifetimeBudget;
+                                        const isDailyExhausted = dailyBudget > 0 && Math.round(todaySpend * 100) >= dailyBudget;
+                                        const isCompleted = isAdExpired || isLifetimeExhausted;
+                                        const text = isAdScheduled ? "SCHEDULED" : isCompleted ? "Completed" : isDailyExhausted ? "Daily Budget End" : ad.effective_status === "IN_PROCESS" ? "Reviewing..." : ad.effective_status;
+                                        const color = isAdScheduled ? "#2563eb" : isCompleted ? "#64748b" : isDailyExhausted ? "#d97706" : ad.effective_status === "ACTIVE" ? "var(--green)" : ad.effective_status === "IN_PROCESS" ? "#7c3aed" : "var(--amber)";
+                                        const bg = isAdScheduled ? "#eff6ff" : isCompleted ? "#f1f5f9" : isDailyExhausted ? "#fffbeb" : ad.effective_status === "ACTIVE" ? "var(--green-light)" : ad.effective_status === "IN_PROCESS" ? "#f5f3ff" : "var(--amber-light)";
+                                        return <Badge text={text} color={color} bg={bg} />;
                                       })()}
                                     </div>
                                     <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>ID: {ad.id}</div>
