@@ -86,6 +86,7 @@ const DEFAULT_CONFIG: any = {
     call_to_action_type: "LEARN_MORE",
     facebook_page: "",
     instagram_account: "",
+    lead_gen_form_id: "",
   },
   link_data: "",
 };
@@ -155,6 +156,19 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
   const [hydrated, setHydrated] = useState(false);
   const lastAppliedAdRef = useRef<string | null>(null);
   const [stepErrors, setStepErrors] = useState<string[]>([]);
+  const [leadForms, setLeadForms] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [leadFormsLoading, setLeadFormsLoading] = useState(false);
+
+  // Fetch lead gen forms whenever the objective is OUTCOME_LEADS
+  useEffect(() => {
+    if (config.campaign?.objective !== "OUTCOME_LEADS") return;
+    setLeadFormsLoading(true);
+    fetch("/api/meta/lead-forms")
+      .then(r => r.json())
+      .then(data => setLeadForms(Array.isArray(data) ? data : []))
+      .catch(() => setLeadForms([]))
+      .finally(() => setLeadFormsLoading(false));
+  }, [config.campaign?.objective]);
 
   const setField = (section: string, key: string, value: any) => {
     setConfig((prev: any) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
@@ -845,6 +859,46 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
               })()}
             </div>
           </div>
+
+          {/* Lead Gen Form — shown only when objective is Leads */}
+          {config.campaign?.objective === "OUTCOME_LEADS" && (
+            <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #bfdbfe", overflow: "hidden", boxShadow: "0 1px 4px rgba(37,99,235,0.06)" }}>
+              <div style={{ padding: "16px 24px", borderBottom: "1px solid #e0f2fe", background: "#eff6ff", borderRadius: "16px 16px 0 0", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📋</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a8a" }}>Lead Gen Form</div>
+                  <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 1 }}>When someone clicks your ad, this form opens — no website visit needed.</div>
+                </div>
+              </div>
+              <div style={{ padding: "20px 24px" }}>
+                {leadFormsLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", color: "#64748b", fontSize: 13 }}>
+                    <Spinner size={14} /> Loading your forms...
+                  </div>
+                ) : leadForms.length === 0 ? (
+                  <div style={{ padding: "14px 16px", background: "#fef9c3", borderRadius: 10, border: "1px solid #fde68a", fontSize: 13, color: "#92400e" }}>
+                    No lead forms found on your page. Create one in Meta Forms Library and it will appear here.
+                  </div>
+                ) : (
+                  <Label label="Select Form">
+                    <CustomSelect
+                      value={config.ad?.lead_gen_form_id || ""}
+                      onChange={v => setField("ad", "lead_gen_form_id", v)}
+                      options={[
+                        { value: "", label: "— No form (use website URL instead) —" },
+                        ...leadForms.map(f => ({ value: f.id, label: f.name })),
+                      ]}
+                    />
+                    {config.ad?.lead_gen_form_id && (
+                      <div style={{ fontSize: 11, color: "#16a34a", marginTop: 6, fontWeight: 600 }}>
+                        ✓ Form selected — Destination URL below will be ignored for this ad.
+                      </div>
+                    )}
+                  </Label>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Ad Copy */}
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>

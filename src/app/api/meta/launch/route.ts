@@ -302,7 +302,14 @@ async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCb
 }
 
 // ── STEP 4: Ad Creative ──
-async function createAdCreative(adAccountId, accessToken, isVideo, pageId, mediaPayload, headline, primaryText, websiteUrl, ctaType, adName) {
+async function createAdCreative(adAccountId, accessToken, isVideo, pageId, mediaPayload, headline, primaryText, websiteUrl, ctaType, adName, leadGenFormId = null) {
+  // When a lead gen form is selected, CTA value uses form ID instead of a URL
+  const ctaValue = leadGenFormId
+    ? { lead_gen_form_id: leadGenFormId }
+    : { link: websiteUrl };
+  // Lead gen ads link to the Page, not an external website
+  const adLink = leadGenFormId ? `https://www.facebook.com/${pageId}` : websiteUrl;
+
   let objectStorySpec;
   if (isVideo) {
     objectStorySpec = {
@@ -315,7 +322,7 @@ async function createAdCreative(adAccountId, accessToken, isVideo, pageId, media
         link_description: headline,
         call_to_action: {
           type: ctaType,
-          value: { link: websiteUrl },
+          value: ctaValue,
         },
       },
     };
@@ -324,12 +331,12 @@ async function createAdCreative(adAccountId, accessToken, isVideo, pageId, media
       page_id: pageId,
       link_data: {
         image_hash: mediaPayload.image_hash,
-        link: websiteUrl,
+        link: adLink,
         message: primaryText,
         name: headline,
         call_to_action: {
           type: ctaType,
-          value: { link: websiteUrl },
+          value: ctaValue,
         },
       },
     };
@@ -504,21 +511,26 @@ export async function POST(request) {
       dsa_payor: dsaPayor,
     };
 
+    const leadGenFormId = ad?.lead_gen_form_id || null;
+    // When a lead gen form is attached, use LEAD_GENERATION optimization — no pixel needed
+    const isLeadGenForm = objective === "OUTCOME_LEADS" && !!leadGenFormId;
+
     // Dynamic Optimization Goal and Pixel requirements
     const userGoal = ad_set?.optimization_goal || "LINK_CLICKS";
-    const isPixelRequired = 
-      objective === "OUTCOME_SALES" || 
-      objective === "OUTCOME_LEADS" || 
-      userGoal === "OFFSITE_CONVERSIONS";
+    const isPixelRequired = !isLeadGenForm && (
+      objective === "OUTCOME_SALES" ||
+      objective === "OUTCOME_LEADS" ||
+      userGoal === "OFFSITE_CONVERSIONS"
+    );
 
     let promotedObject: any = null;
     let trackingSpecs: any = null;
-    let optimizationGoal = userGoal;
+    let optimizationGoal = isLeadGenForm ? "LEAD_GENERATION" : userGoal;
 
     if (isPixelRequired) {
       const pixelId = await getOrCreatePixelId(accessToken, adAccountId);
       console.log(`Using pixel ID: ${pixelId} for objective ${objective}`);
-      
+
       const customEvent = objective === "OUTCOME_SALES" ? "PURCHASE" : "LEAD";
       promotedObject = {
         pixel_id: pixelId,
@@ -544,6 +556,11 @@ export async function POST(request) {
       fetchPageId(accessToken)
     ]);
 
+    // For lead gen forms, promoted_object references the Page (not a pixel)
+    if (isLeadGenForm) {
+      promotedObject = { page_id: pageId };
+    }
+
     // ── Sequential Tasks: Campaign -> Ad Set -> Creative -> Ad ──
     const campaignId = await createCampaign(
       existingCampaignId, adAccountId, accessToken, campaignName, objective,
@@ -558,7 +575,7 @@ export async function POST(request) {
 
     const creativeId = await createAdCreative(
       adAccountId, accessToken, isVideo, pageId, mediaPayload,
-      headline, primaryText, websiteUrl, ctaType, adName
+      headline, primaryText, websiteUrl, ctaType, adName, leadGenFormId
     );
 
     const adId = await createAd(
