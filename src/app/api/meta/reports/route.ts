@@ -55,7 +55,9 @@ export async function GET(request: Request) {
     const processInsights = (insight: Record<string, unknown> | null | undefined) => {
       if (!insight) return insight;
       const actions = (insight.actions as Array<{ action_type: string; value: string }>) || [];
-      const leads = actions.find(a => a.action_type === 'lead')?.value || 0;
+      const leadVal = actions.find(a => a.action_type === 'lead')?.value;
+      const onsiteLeadVal = actions.find(a => a.action_type === 'onsite_conversion.lead_grouped')?.value;
+      const leads = String(parseInt(leadVal || "0") + parseInt(onsiteLeadVal || "0")) || 0;
       const linkClicks = actions.find(a => a.action_type === 'link_click')?.value || 0;
       return { ...insight, leads, linkClicks };
     };
