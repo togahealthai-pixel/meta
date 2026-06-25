@@ -268,7 +268,7 @@ async function createCampaign(existingCampaignId, adAccountId, accessToken, camp
 }
 
 // ── STEP 3: Ad Set ──
-async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCbo, budgetType, dailyBudget, lifetimeBudget, startTime, stopTime, targeting, dsaFields, optimizationGoal, promotedObject, adStatus = "PAUSED") {
+async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCbo, budgetType, dailyBudget, lifetimeBudget, startTime, stopTime, targeting, dsaFields, optimizationGoal, promotedObject, adStatus = "PAUSED", destinationType = null) {
   const bodyPayload: any = {
     name: adSetName,
     campaign_id: campaignId,
@@ -280,6 +280,7 @@ async function createAdSet(adAccountId, accessToken, adSetName, campaignId, isCb
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     targeting,
     ...dsaFields,
+    ...(destinationType ? { destination_type: destinationType } : {}),
     status: adStatus,
     access_token: accessToken,
   };
@@ -570,7 +571,8 @@ export async function POST(request) {
     const adSetId = await createAdSet(
       adAccountId, accessToken, adSetName, campaignId, isCbo,
       budgetType, dailyBudget, lifetimeBudget, startTime, stopTime,
-      targeting, dsaFields, optimizationGoal, promotedObject, adStatus
+      targeting, dsaFields, optimizationGoal, promotedObject, adStatus,
+      isLeadGenForm ? "ON_AD" : null
     );
 
     const creativeId = await createAdCreative(
