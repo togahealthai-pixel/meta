@@ -158,17 +158,49 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
   const [stepErrors, setStepErrors] = useState<string[]>([]);
   const [leadForms, setLeadForms] = useState<{ id: string; name: string; status: string }[]>([]);
   const [leadFormsLoading, setLeadFormsLoading] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newFormName, setNewFormName] = useState("");
+  const [newFormRedirectType, setNewFormRedirectType] = useState<"website" | "whatsapp">("website");
+  const [newFormRedirectUrl, setNewFormRedirectUrl] = useState("");
+  const [creatingForm, setCreatingForm] = useState(false);
+  const [createFormError, setCreateFormError] = useState("");
 
-  // Fetch lead gen forms whenever the objective is OUTCOME_LEADS
-  useEffect(() => {
-    if (config.campaign?.objective !== "OUTCOME_LEADS") return;
+  const fetchLeadForms = () => {
     setLeadFormsLoading(true);
     fetch("/api/meta/lead-forms")
       .then(r => r.json())
       .then(data => setLeadForms(Array.isArray(data) ? data : []))
       .catch(() => setLeadForms([]))
       .finally(() => setLeadFormsLoading(false));
+  };
+
+  // Fetch lead gen forms whenever the objective is OUTCOME_LEADS
+  useEffect(() => {
+    if (config.campaign?.objective !== "OUTCOME_LEADS") return;
+    fetchLeadForms();
   }, [config.campaign?.objective]);
+
+  const handleCreateForm = async () => {
+    if (!newFormName.trim()) { setCreateFormError("Form name is required."); return; }
+    setCreatingForm(true);
+    setCreateFormError("");
+    try {
+      const res = await fetch("/api/meta/lead-forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newFormName.trim(), redirectType: newFormRedirectType, redirectUrl: newFormRedirectUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCreateFormError(data.error || "Failed to create form."); return; }
+      // Add to list and auto-select
+      setLeadForms(prev => [...prev, data]);
+      setField("ad", "lead_gen_form_id", data.id);
+      setShowCreateForm(false);
+      setNewFormName("");
+      setNewFormRedirectUrl("");
+    } catch { setCreateFormError("Network error. Please try again."); }
+    finally { setCreatingForm(false); }
+  };
 
   const setField = (section: string, key: string, value: any) => {
     setConfig((prev: any) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
@@ -355,12 +387,14 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
       if (!config.ad?.name?.trim()) errs.push("Ad Name is required.");
       if (!config.ad?.primary_text?.trim()) errs.push("Primary Text is required.");
       if (!config.ad?.headline?.trim()) errs.push("Headline is required.");
-      const url = config.ad?.website_url?.trim();
-      if (!url) {
-        errs.push("Destination URL is required.");
-      } else {
-        try { new URL(url); if (!/^https?:\/\/.+\..+/.test(url)) throw new Error(); }
-        catch { errs.push("Destination URL is invalid. Must start with https:// or http:// (e.g. https://example.com)."); }
+      if (!config.ad?.lead_gen_form_id) {
+        const url = config.ad?.website_url?.trim();
+        if (!url) {
+          errs.push("Destination URL is required.");
+        } else {
+          try { new URL(url); if (!/^https?:\/\/.+\..+/.test(url)) throw new Error(); }
+          catch { errs.push("Destination URL is invalid. Must start with https:// or http:// (e.g. https://example.com)."); }
+        }
       }
     }
     return errs;
@@ -863,38 +897,88 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
           {/* Lead Gen Form — shown only when objective is Leads */}
           {config.campaign?.objective === "OUTCOME_LEADS" && (
             <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #bfdbfe", overflow: "hidden", boxShadow: "0 1px 4px rgba(37,99,235,0.06)" }}>
-              <div style={{ padding: "16px 24px", borderBottom: "1px solid #e0f2fe", background: "#eff6ff", borderRadius: "16px 16px 0 0", display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📋</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a8a" }}>Lead Gen Form</div>
-                  <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 1 }}>When someone clicks your ad, this form opens — no website visit needed.</div>
-                </div>
-              </div>
-              <div style={{ padding: "20px 24px" }}>
-                {leadFormsLoading ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", color: "#64748b", fontSize: 13 }}>
-                    <Spinner size={14} /> Loading your forms...
+              <div style={{ padding: "16px 24px", borderBottom: "1px solid #e0f2fe", background: "#eff6ff", borderRadius: "16px 16px 0 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📋</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a8a" }}>Lead Gen Form</div>
+                    <div style={{ fontSize: 11, color: "#3b82f6", marginTop: 1 }}>Form opens when someone clicks the ad — leads captured inside Facebook.</div>
                   </div>
-                ) : leadForms.length === 0 ? (
-                  <div style={{ padding: "14px 16px", background: "#fef9c3", borderRadius: 10, border: "1px solid #fde68a", fontSize: 13, color: "#92400e" }}>
-                    No lead forms found on your page. Create one in Meta Forms Library and it will appear here.
+                </div>
+                <button onClick={fetchLeadForms} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid #bfdbfe", background: "#fff", cursor: "pointer", fontSize: 14, color: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
+              </div>
+              <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+                {leadFormsLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#64748b", fontSize: 13 }}>
+                    <Spinner size={14} /> Loading forms...
                   </div>
                 ) : (
                   <Label label="Select Form">
                     <CustomSelect
                       value={config.ad?.lead_gen_form_id || ""}
-                      onChange={v => setField("ad", "lead_gen_form_id", v)}
+                      onChange={v => {
+                        if (v === "__create__") { setShowCreateForm(true); return; }
+                        setField("ad", "lead_gen_form_id", v);
+                        setShowCreateForm(false);
+                      }}
                       options={[
-                        { value: "", label: "— No form (use website URL instead) —" },
+                        { value: "", label: "— No form (use Destination URL) —" },
                         ...leadForms.map(f => ({ value: f.id, label: f.name })),
+                        { value: "__create__", label: "+ Create New Form" },
                       ]}
                     />
                     {config.ad?.lead_gen_form_id && (
-                      <div style={{ fontSize: 11, color: "#16a34a", marginTop: 6, fontWeight: 600 }}>
-                        ✓ Form selected — Destination URL below will be ignored for this ad.
+                      <div style={{ fontSize: 11, color: "#16a34a", marginTop: 5, fontWeight: 600 }}>
+                        ✓ Form selected — Destination URL field is hidden for this ad.
                       </div>
                     )}
                   </Label>
+                )}
+
+                {/* Create New Form panel */}
+                {showCreateForm && (
+                  <div style={{ background: "#f8fafc", borderRadius: 12, border: "1.5px solid #e2e8f0", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Create New Form</div>
+                    <Label label="Form Name">
+                      <input value={newFormName} onChange={e => setNewFormName(e.target.value)} placeholder="e.g. Togah Health - Consultation" style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
+                    </Label>
+                    <Label label="After Submit — Redirect To">
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {(["website", "whatsapp"] as const).map(type => (
+                          <button key={type} type="button" onClick={() => {
+                            setNewFormRedirectType(type);
+                            setNewFormRedirectUrl(type === "whatsapp" ? "https://wa.me/14374763375" : "");
+                          }}
+                            style={{
+                              flex: 1, padding: "9px 12px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                              border: newFormRedirectType === type ? "2px solid #2563eb" : "1.5px solid #e2e8f0",
+                              background: newFormRedirectType === type ? "#eff6ff" : "#fff",
+                              color: newFormRedirectType === type ? "#1d4ed8" : "#64748b",
+                            }}>
+                            {type === "website" ? "🌐 Website" : "💬 WhatsApp"}
+                          </button>
+                        ))}
+                      </div>
+                    </Label>
+                    <Label label={newFormRedirectType === "whatsapp" ? "WhatsApp URL" : "Website URL"}>
+                      <input value={newFormRedirectUrl} onChange={e => setNewFormRedirectUrl(e.target.value)}
+                        placeholder={newFormRedirectType === "whatsapp" ? "https://wa.me/14374763375" : "https://togahh.com"}
+                        style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
+                    </Label>
+                    {createFormError && (
+                      <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{createFormError}</div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button type="button" onClick={handleCreateForm} disabled={creatingForm}
+                        style={{ flex: 1, padding: "10px 0", borderRadius: 9, border: "none", background: creatingForm ? "#94a3b8" : "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700, cursor: creatingForm ? "not-allowed" : "pointer" }}>
+                        {creatingForm ? "Creating..." : "Create Form"}
+                      </button>
+                      <button type="button" onClick={() => { setShowCreateForm(false); setCreateFormError(""); }}
+                        style={{ padding: "10px 16px", borderRadius: 9, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -926,7 +1010,16 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                 <CustomSelect
                   value={config.ad?.call_to_action_type || "LEARN_MORE"}
                   onChange={v => setField("ad", "call_to_action_type", v)}
-                  options={[
+                  options={config.ad?.lead_gen_form_id ? [
+                    { value: "LEARN_MORE", label: "Learn More" },
+                    { value: "SIGN_UP",    label: "Sign Up" },
+                    { value: "CONTACT_US", label: "Contact Us" },
+                    { value: "GET_QUOTE",  label: "Get Quote" },
+                    { value: "APPLY_NOW",  label: "Apply Now" },
+                    { value: "SUBSCRIBE",  label: "Subscribe" },
+                    { value: "DOWNLOAD",   label: "Download" },
+                    { value: "GET_OFFER",  label: "Get Offer" },
+                  ] : [
                     { value: "LEARN_MORE",  label: "Learn More" },
                     { value: "SHOP_NOW",    label: "Shop Now" },
                     { value: "BOOK_TRAVEL", label: "Book Now" },
@@ -948,8 +1041,8 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                 <input value={config.ad?.description || ""} onChange={e => setField("ad", "description", e.target.value)} style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
               </Label>
 
-              {/* Destination URL */}
-              {(() => {
+              {/* Destination URL — hidden when lead gen form is selected */}
+              {!config.ad?.lead_gen_form_id && (() => {
                 const url = config.ad?.website_url?.trim();
                 let urlValid = true;
                 if (url) { try { new URL(url); if (!/^https?:\/\/.+\..+/.test(url)) throw new Error(); } catch { urlValid = false; } }

@@ -308,8 +308,8 @@ async function createAdCreative(adAccountId, accessToken, isVideo, pageId, media
   const ctaValue = leadGenFormId
     ? { lead_gen_form_id: leadGenFormId }
     : { link: websiteUrl };
-  // Lead gen ads link to the Page, not an external website
-  const adLink = leadGenFormId ? `https://www.facebook.com/${pageId}` : websiteUrl;
+  // Meta requires an external URL even for lead gen ads — use websiteUrl always
+  const adLink = websiteUrl;
 
   let objectStorySpec;
   if (isVideo) {
