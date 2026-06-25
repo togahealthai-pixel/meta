@@ -607,7 +607,7 @@ export default function SocialDash() {
   const handleSocialPost = async () => {
     setIsImagePosting(true);
     try {
-      const webhookUrl = "https://n8n.srv1208919.hstgr.cloud/webhook/5636fbef-db11-419b-b7cf-92bff14c25b7";
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_POST_IMAGE_URL;
       await triggerWebhook(
         webhookUrl,
         "post_social",
@@ -637,7 +637,7 @@ export default function SocialDash() {
     setIsImageGenerating(true);
     setGeneratedSocialImage(null);
 
-    const webhookUrl = "https://n8n.srv1208919.hstgr.cloud/webhook/40fe1e56-2ab7-4e38-9bf4-9cbdf4bd7fd4";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_REGEN_URL;
     const result = await triggerWebhook(
       webhookUrl,
       "images",
@@ -829,7 +829,7 @@ export default function SocialDash() {
     localStorage.setItem('sd_generation_start', Date.now().toString());
     setStatus("Generating your social video preview...");
 
-    const webhookUrl = "https://n8n.srv1208919.hstgr.cloud/webhook/c44e7bac-b0db-43a7-96d3-8b2a3f483885";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_CONFIRM_URL;
     console.log("[UI] Confirming prompts to:", webhookUrl);
 
     let result: any = null;
@@ -1662,7 +1662,7 @@ export default function SocialDash() {
   };
 
   const handlePostVideo = () => {
-    const webhookUrl = "https://n8n.srv1208919.hstgr.cloud/webhook/9f2515c1-b4fc-4dc9-9f39-8e766aee0dc6";
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_POST_VIDEO_URL;
     triggerWebhook(
       webhookUrl,
       "post",
