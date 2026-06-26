@@ -31,10 +31,30 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { name, redirectType, redirectUrl } = await request.json();
+    const { name, redirectType, redirectUrl, presetQuestions, customQuestions } = await request.json();
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Form name is required" }, { status: 400 });
+    }
+
+    // Build questions array
+    const PRESET_TYPE_MAP: Record<string, string> = {
+      FULL_NAME: "FULL_NAME",
+      EMAIL: "EMAIL",
+      PHONE: "PHONE",
+    };
+    const questions: any[] = [];
+    const selectedPresets: string[] = Array.isArray(presetQuestions) ? presetQuestions : ["FULL_NAME", "EMAIL", "PHONE"];
+    for (const pid of selectedPresets) {
+      if (PRESET_TYPE_MAP[pid]) questions.push({ type: PRESET_TYPE_MAP[pid] });
+    }
+    if (Array.isArray(customQuestions)) {
+      for (const text of customQuestions) {
+        if (text?.trim()) questions.push({ type: "CUSTOM", label: text.trim(), field_type: "TEXT" });
+      }
+    }
+    if (questions.length === 0) {
+      return NextResponse.json({ error: "At least one question is required" }, { status: 400 });
     }
 
     const thankYouPage = redirectUrl?.trim()
@@ -51,11 +71,7 @@ export async function POST(request: Request) {
 
     const body: any = {
       name: name.trim(),
-      questions: [
-        { type: "FULL_NAME" },
-        { type: "EMAIL" },
-        { type: "PHONE" },
-      ],
+      questions,
       privacy_policy: {
         url: "https://togahhealth.ai/privacy-policy",
         link_text: "Privacy Policy",
