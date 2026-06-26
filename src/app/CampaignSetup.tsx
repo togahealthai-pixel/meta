@@ -164,6 +164,7 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
   const [newFormRedirectUrl, setNewFormRedirectUrl] = useState("");
   const [creatingForm, setCreatingForm] = useState(false);
   const [createFormError, setCreateFormError] = useState("");
+  const [deletingFormId, setDeletingFormId] = useState<string | null>(null);
   const PRESET_QUESTIONS = [
     { id: "FULL_NAME", label: "Full Name" },
     { id: "EMAIL",     label: "Email" },
@@ -187,6 +188,21 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
     if (config.campaign?.objective !== "OUTCOME_LEADS") return;
     fetchLeadForms();
   }, [config.campaign?.objective]);
+
+  const handleDeleteForm = async (formId: string) => {
+    if (!formId) return;
+    const form = leadForms.find(f => f.id === formId);
+    if (!window.confirm(`Delete "${form?.name || formId}"? This cannot be undone.`)) return;
+    setDeletingFormId(formId);
+    try {
+      const res = await fetch(`/api/meta/lead-forms?formId=${formId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Failed to delete form."); return; }
+      setLeadForms(prev => prev.filter(f => f.id !== formId));
+      if (config.ad?.lead_gen_form_id === formId) setField("ad", "lead_gen_form_id", "");
+    } catch { alert("Network error. Please try again."); }
+    finally { setDeletingFormId(null); }
+  };
 
   const resetCreateForm = () => {
     setShowCreateForm(false);
@@ -945,13 +961,15 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                       value={config.ad?.lead_gen_form_id || ""}
                       onChange={v => {
                         if (v === "__create__") { setShowCreateForm(true); return; }
+                        if (v === "__delete__") { handleDeleteForm(config.ad?.lead_gen_form_id || ""); return; }
                         setField("ad", "lead_gen_form_id", v);
                         setShowCreateForm(false);
                       }}
                       options={[
                         { value: "", label: "— No form (use Destination URL) —" },
-                        ...leadForms.map(f => ({ value: f.id, label: f.name })),
+                        ...leadForms.map(f => ({ value: f.id, label: deletingFormId === f.id ? "Deleting..." : f.name })),
                         { value: "__create__", label: "+ Create New Form" },
+                        ...(config.ad?.lead_gen_form_id ? [{ value: "__delete__", label: "🗑 Delete selected form" }] : []),
                       ]}
                     />
                     {config.ad?.lead_gen_form_id && (

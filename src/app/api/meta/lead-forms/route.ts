@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
     if (Array.isArray(customQuestions)) {
       for (const text of customQuestions) {
-        if (text?.trim()) questions.push({ type: "CUSTOM", label: text.trim(), field_type: "TEXT" });
+        if (text?.trim()) questions.push({ type: "CUSTOM", label: text.trim() });
       }
     }
     if (questions.length === 0) {
@@ -91,6 +91,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: data.error?.message || "Failed to create form" }, { status: 500 });
     }
     return NextResponse.json({ id: data.id, name: name.trim(), status: "ACTIVE" });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const pageToken = process.env.META_PAGE_TOKEN;
+
+  if (!pageToken) {
+    return NextResponse.json({ error: "META_PAGE_TOKEN not configured" }, { status: 500 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const formId = searchParams.get("formId");
+
+    if (!formId) {
+      return NextResponse.json({ error: "formId is required" }, { status: 400 });
+    }
+
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${formId}?access_token=${pageToken}`,
+      { method: "DELETE" }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      return NextResponse.json({ error: data.error?.message || "Failed to delete form" }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
