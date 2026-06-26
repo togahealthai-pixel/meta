@@ -61,12 +61,13 @@ const TABS = [
   { id: "live_campaigns", label: "Running Campaign", icon: TrendingUp },
   { id: "reports", label: "Reports", icon: PieChart },
   { id: "report_analysis", label: "Report Analysis", icon: LineChart },
+  { id: "leads", label: "Lead Responses", icon: Users },
   { id: "social-dash", label: "Social-Dash", icon: Share2 },
   { id: "newsletter", label: "Newsletter", icon: Newspaper, externalLink: "https://newsletter-weld-rho.vercel.app/newsletter/generate" },
   { id: "outreach", label: "Outreach", icon: Send, externalLink: "https://outreach-seven-phi.vercel.app" },
 ];
 
-const META_ADS_IDS = new Set(["overview", "create", "approval", "campaigns", "live_campaigns", "reports", "report_analysis"]);
+const META_ADS_IDS = new Set(["overview", "create", "approval", "campaigns", "live_campaigns", "reports", "report_analysis", "leads"]);
 
 const TOPICS = [
   "Advanced Orthopedics",
@@ -888,6 +889,24 @@ export default function Dashboard() {
   const [metaReportsError, setMetaReportsError] = useState("");
   const [selectedCampaignForReports, setSelectedCampaignForReports] = useState(null);
 
+  // Lead Responses State
+  const [leadsData, setLeadsData] = useState<{ leads: any[]; fieldKeys: string[] }>({ leads: [], fieldKeys: [] });
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsError, setLeadsError] = useState("");
+  const [leadsFormFilter, setLeadsFormFilter] = useState("all");
+
+  const fetchLeads = async () => {
+    setLeadsLoading(true);
+    setLeadsError("");
+    try {
+      const res = await fetch("/api/meta/leads");
+      const data = await res.json();
+      if (!res.ok) { setLeadsError(data.error || "Failed to fetch leads"); return; }
+      setLeadsData(data);
+    } catch { setLeadsError("Network error. Please try again."); }
+    finally { setLeadsLoading(false); }
+  };
+
   // Report Analysis State
   const [reportFilter, setReportFilter] = useState<"live" | "paused" | "both">("both");
   const [reportNote, setReportNote] = useState("");
@@ -1352,6 +1371,9 @@ export default function Dashboard() {
         .then((r) => r.json())
         .then((d) => { if (d.campaigns) setReportCampaigns(d.campaigns); })
         .catch(() => {});
+    }
+    if (tab === "leads" && leadsData.leads.length === 0) {
+      fetchLeads();
     }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -4030,7 +4052,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Autocomplete Dropdown list */}
-                    {showLocationDropdown && createPortal(
+                    {showLocationDropdown && (
                       <div
                         style={{
                           position: "fixed",
@@ -4084,8 +4106,7 @@ export default function Dashboard() {
                             </span>
                           </div>
                         ))}
-                      </div>,
-                      document.body
+                      </div>
                     )}
 
                     {/* Selected Countries Location Pin Badges */}
@@ -6612,7 +6633,7 @@ export default function Dashboard() {
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Spend</th>
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Impr.</th>
                           <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>CTR</th>
-                          <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Clicks</th>
+                          <th style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Leads</th>
                           <th style={{ padding: "12px 20px", textAlign: "center", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border)", fontSize: 11, textTransform: "uppercase" }}>Actions</th>
                         </tr>
                       </thead>
@@ -6642,7 +6663,7 @@ export default function Dashboard() {
                                 {parseFloat(ins.inline_link_click_ctr || 0).toFixed(2)}%
                               </td>
                               <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600 }}>
-                                {parseFloat(ins.clicks || "0").toLocaleString()}
+                                {parseFloat(ins.leads || "0").toLocaleString()}
                               </td>
                               <td style={{ padding: "16px 20px", textAlign: "center" }}>
                                 <button
@@ -7219,6 +7240,108 @@ export default function Dashboard() {
                 {reportLoading ? <><Spinner size={14} color="#94a3b8" /> Analysing...</> : "Analyse"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          LEAD RESPONSES — Form submissions from Meta lead gen
+      ═══════════════════════════════════════════════════════ */}
+      {tab === "leads" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>Meta Lead Gen</div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>Lead Responses</h2>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0 0" }}>All leads collected from your Meta lead gen forms.</p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* Form filter */}
+              {leadsData.leads.length > 0 && (
+                <select
+                  value={leadsFormFilter}
+                  onChange={e => setLeadsFormFilter(e.target.value)}
+                  style={{ padding: "8px 12px", borderRadius: 9, border: "1.5px solid var(--border)", background: "#fff", fontSize: 13, fontWeight: 500, color: "var(--text)", cursor: "pointer", outline: "none" }}
+                >
+                  <option value="all">All Forms</option>
+                  {Array.from(new Set(leadsData.leads.map((l: any) => l.form_name))).map((name: any) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={fetchLeads}
+                disabled={leadsLoading}
+                style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, border: "1.5px solid var(--border)", background: "#fff", color: "var(--text)", fontSize: 13, fontWeight: 600, cursor: leadsLoading ? "not-allowed" : "pointer", opacity: leadsLoading ? 0.6 : 1 }}
+              >
+                {leadsLoading ? <Spinner size={13} /> : "↻"} Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+            {leadsLoading ? (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 60 }}>
+                <Spinner size={24} />
+              </div>
+            ) : leadsError ? (
+              <div style={{ padding: 32, textAlign: "center", color: "#dc2626", fontSize: 13 }}>{leadsError}</div>
+            ) : leadsData.leads.length === 0 ? (
+              <div style={{ padding: "60px 32px", textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>No leads yet</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Leads will appear here once someone fills your form.</div>
+              </div>
+            ) : (() => {
+              const filtered = leadsFormFilter === "all" ? leadsData.leads : leadsData.leads.filter((l: any) => l.form_name === leadsFormFilter);
+              const fieldLabels: Record<string, string> = {
+                full_name: "Name", email: "Email", phone_number: "Phone",
+                city: "City", state: "State", zip_code: "Zip",
+                job_title: "Job Title", company_name: "Company",
+              };
+              return (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--border)" }}>
+                        <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Date</th>
+                        {leadsData.fieldKeys.map((key: string) => (
+                          <th key={key} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+                            {fieldLabels[key] || key.replace(/_/g, " ")}
+                          </th>
+                        ))}
+                        <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Form</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((lead: any, i: number) => (
+                        <tr key={lead.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                          <td style={{ padding: "12px 16px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                            {new Date(lead.created_time).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                          {leadsData.fieldKeys.map((key: string) => (
+                            <td key={key} style={{ padding: "12px 16px", color: "var(--text)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {lead.fields[key] || <span style={{ color: "#cbd5e1" }}>—</span>}
+                            </td>
+                          ))}
+                          <td style={{ padding: "12px 16px", whiteSpace: "nowrap" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: lead.form_name?.includes("WhatsApp") ? "#f0fdf4" : "#eff6ff", color: lead.form_name?.includes("WhatsApp") ? "#16a34a" : "#1d4ed8", border: `1px solid ${lead.form_name?.includes("WhatsApp") ? "#86efac" : "#bfdbfe"}` }}>
+                              {lead.form_name?.includes("WhatsApp") ? "💬 WhatsApp" : lead.form_name?.includes("Website") ? "🌐 Website" : lead.form_name}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ padding: "10px 16px", borderTop: "1px solid #f1f5f9", fontSize: 12, color: "var(--text-muted)", display: "flex", justifyContent: "space-between" }}>
+                    <span>Showing {filtered.length} of {leadsData.leads.length} leads</span>
+                    <span>Last refreshed: {new Date().toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
