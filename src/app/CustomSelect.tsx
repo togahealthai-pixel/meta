@@ -24,7 +24,7 @@ export default function CustomSelect({ value, onChange, options, style }: Custom
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
-    const dropHeight = Math.min(options.length * 44, 220);
+    const dropHeight = Math.min(options.length * 44, 340);
 
     // Clamp left so dropdown never overflows right edge
     const maxLeft = window.innerWidth - rect.width - 8;
@@ -116,7 +116,7 @@ export default function CustomSelect({ value, onChange, options, style }: Custom
               border: "1.5px solid #e2e8f0",
               boxShadow: "0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
               overflow: "hidden",
-              maxHeight: 220,
+              maxHeight: 340,
               overflowY: "auto",
             }}
           >

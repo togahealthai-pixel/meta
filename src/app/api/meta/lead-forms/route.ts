@@ -111,9 +111,14 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "formId is required" }, { status: 400 });
     }
 
+    // Meta doesn't support HTTP DELETE on lead gen forms — archive instead
     const res = await fetch(
-      `https://graph.facebook.com/v21.0/${formId}?access_token=${pageToken}`,
-      { method: "DELETE" }
+      `https://graph.facebook.com/v21.0/${formId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archive: true, access_token: pageToken }),
+      }
     );
     const data = await res.json();
     if (!res.ok) {
