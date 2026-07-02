@@ -960,16 +960,11 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                     <CustomSelect
                       value={config.ad?.lead_gen_form_id || ""}
                       onChange={v => {
-                        if (v === "__create__") { setShowCreateForm(true); return; }
-                        if (v === "__delete__") { handleDeleteForm(config.ad?.lead_gen_form_id || ""); return; }
                         setField("ad", "lead_gen_form_id", v);
-                        setShowCreateForm(false);
                       }}
                       options={[
                         { value: "", label: "— No form (use Destination URL) —" },
-                        ...leadForms.map(f => ({ value: f.id, label: deletingFormId === f.id ? "Deleting..." : f.name })),
-                        { value: "__create__", label: "+ Create New Form" },
-                        ...(config.ad?.lead_gen_form_id ? [{ value: "__delete__", label: "🗑 Delete selected form" }] : []),
+                        ...leadForms.map(f => ({ value: f.id, label: f.name })),
                       ]}
                     />
                     {config.ad?.lead_gen_form_id && (
@@ -980,104 +975,6 @@ export default function CampaignSetup({ onSelect, selectedId, selectedAd, approv
                   </Label>
                 )}
 
-                {/* Create New Form panel */}
-                {showCreateForm && (
-                  <div style={{ background: "#f8fafc", borderRadius: 12, border: "1.5px solid #e2e8f0", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Create New Form</div>
-
-                    <Label label="Form Name">
-                      <input value={newFormName} onChange={e => setNewFormName(e.target.value)} placeholder="e.g. Togah Health - Consultation" style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
-                    </Label>
-
-                    {/* Questions */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Questions</div>
-
-                      {/* Preset toggles */}
-                      {PRESET_QUESTIONS.map(q => (
-                        <label key={q.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: presetEnabled[q.id] ? "#eff6ff" : "#fff" }}>
-                          <input type="checkbox" checked={!!presetEnabled[q.id]} onChange={() => setPresetEnabled(prev => ({ ...prev, [q.id]: !prev[q.id] }))} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
-                          <span style={{ fontSize: 13, fontWeight: 600, color: presetEnabled[q.id] ? "#1d4ed8" : "#475569", flex: 1 }}>{q.label}</span>
-                          <span style={{ fontSize: 11, color: "#94a3b8" }}>text</span>
-                        </label>
-                      ))}
-
-                      {/* Custom questions */}
-                      {customQuestions.map(q => (
-                        <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1.5px solid #dbeafe", background: "#f0f9ff" }}>
-                          <span style={{ fontSize: 13, color: "#0f172a", flex: 1 }}>{q.text}</span>
-                          <span style={{ fontSize: 11, color: "#94a3b8", marginRight: 4 }}>text</span>
-                          <button type="button" onClick={() => setCustomQuestions(prev => prev.filter(x => x.id !== q.id))}
-                            style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}>×</button>
-                        </div>
-                      ))}
-
-                      {/* Add custom question input */}
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input
-                          value={newQuestionText}
-                          onChange={e => setNewQuestionText(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" && newQuestionText.trim()) {
-                              setCustomQuestions(prev => [...prev, { id: String(Date.now()), text: newQuestionText.trim() }]);
-                              setNewQuestionText("");
-                            }
-                          }}
-                          placeholder="Type a custom question..."
-                          style={{ ...inputSt, flex: 1, fontSize: 13 }}
-                        />
-                        <button type="button"
-                          onClick={() => {
-                            if (!newQuestionText.trim()) return;
-                            setCustomQuestions(prev => [...prev, { id: String(Date.now()), text: newQuestionText.trim() }]);
-                            setNewQuestionText("");
-                          }}
-                          style={{ padding: "9px 14px", borderRadius: 9, border: "1.5px solid #2563eb", background: "#eff6ff", color: "#2563eb", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Redirect */}
-                    <Label label="After Submit — Redirect To">
-                      <div style={{ display: "flex", gap: 8 }}>
-                        {(["website", "whatsapp"] as const).map(type => (
-                          <button key={type} type="button" onClick={() => {
-                            setNewFormRedirectType(type);
-                            setNewFormRedirectUrl(type === "whatsapp" ? "https://wa.me/14374763375" : "");
-                          }}
-                            style={{
-                              flex: 1, padding: "9px 12px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 700,
-                              border: newFormRedirectType === type ? "2px solid #2563eb" : "1.5px solid #e2e8f0",
-                              background: newFormRedirectType === type ? "#eff6ff" : "#fff",
-                              color: newFormRedirectType === type ? "#1d4ed8" : "#64748b",
-                            }}>
-                            {type === "website" ? "🌐 Website" : "💬 WhatsApp"}
-                          </button>
-                        ))}
-                      </div>
-                    </Label>
-                    <Label label={newFormRedirectType === "whatsapp" ? "WhatsApp URL" : "Website URL"}>
-                      <input value={newFormRedirectUrl} onChange={e => setNewFormRedirectUrl(e.target.value)}
-                        placeholder={newFormRedirectType === "whatsapp" ? "https://wa.me/14374763375" : "https://togahh.com"}
-                        style={{ ...inputSt, width: "100%", boxSizing: "border-box" }} />
-                    </Label>
-
-                    {createFormError && (
-                      <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>{createFormError}</div>
-                    )}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" onClick={handleCreateForm} disabled={creatingForm}
-                        style={{ flex: 1, padding: "10px 0", borderRadius: 9, border: "none", background: creatingForm ? "#94a3b8" : "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700, cursor: creatingForm ? "not-allowed" : "pointer" }}>
-                        {creatingForm ? "Creating..." : "Create Form"}
-                      </button>
-                      <button type="button" onClick={resetCreateForm}
-                        style={{ padding: "10px 16px", borderRadius: 9, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
