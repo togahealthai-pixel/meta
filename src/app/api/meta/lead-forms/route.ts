@@ -16,7 +16,8 @@ export async function GET() {
     if (!res.ok) {
       return NextResponse.json({ error: data.error?.message || "Failed to fetch forms" }, { status: 500 });
     }
-    return NextResponse.json(data.data || []);
+    const forms = (data.data || []).filter((f: any) => f.status !== "ARCHIVED");
+    return NextResponse.json(forms);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -111,13 +112,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "formId is required" }, { status: 400 });
     }
 
-    // Meta doesn't support HTTP DELETE on lead gen forms — archive instead
+    // Meta doesn't support HTTP DELETE on lead gen forms — set status to ARCHIVED instead
     const res = await fetch(
       `https://graph.facebook.com/v21.0/${formId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archive: true, access_token: pageToken }),
+        body: JSON.stringify({ status: "ARCHIVED", access_token: pageToken }),
       }
     );
     const data = await res.json();
