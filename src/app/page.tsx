@@ -907,6 +907,35 @@ export default function Dashboard() {
     finally { setLeadsLoading(false); }
   };
 
+  const LEAD_FIELD_LABELS: Record<string, string> = {
+    full_name: "Name", email: "Email", phone_number: "Phone",
+    city: "City", state: "State", zip_code: "Zip",
+    job_title: "Job Title", company_name: "Company",
+  };
+
+  function exportLeadsToCSV(leads: any[], fieldKeys: string[]) {
+    const headers = ["Date", ...fieldKeys.map(k => LEAD_FIELD_LABELS[k] || k.replace(/_/g, " ")), "Form"];
+    const escape = (val: any) => {
+      const s = String(val ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = leads.map(lead => [
+      new Date(lead.created_time).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      ...fieldKeys.map(k => lead.fields[k] || ""),
+      lead.form_name || "",
+    ].map(escape).join(","));
+    const csv = [headers.map(escape).join(","), ...rows].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `leads-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Report Analysis State
   const [reportFilter, setReportFilter] = useState<"live" | "paused" | "both">("both");
   const [reportNote, setReportNote] = useState("");
@@ -7247,7 +7276,9 @@ export default function Dashboard() {
       {/* ═══════════════════════════════════════════════════════
           LEAD RESPONSES — Form submissions from Meta lead gen
       ═══════════════════════════════════════════════════════ */}
-      {tab === "leads" && (
+      {tab === "leads" && (() => {
+        const filtered = leadsFormFilter === "all" ? leadsData.leads : leadsData.leads.filter((l: any) => l.form_name === leadsFormFilter);
+        return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
@@ -7277,6 +7308,14 @@ export default function Dashboard() {
               >
                 {leadsLoading ? <Spinner size={13} /> : "↻"} Refresh
               </button>
+              {filtered.length > 0 && (
+                <button
+                  onClick={() => exportLeadsToCSV(filtered, leadsData.fieldKeys)}
+                  style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, border: "1.5px solid var(--border)", background: "#fff", color: "var(--text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                >
+                  ⬇ Export CSV
+                </button>
+              )}
             </div>
           </div>
 
@@ -7294,14 +7333,7 @@ export default function Dashboard() {
                 <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>No leads yet</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Leads will appear here once someone fills your form.</div>
               </div>
-            ) : (() => {
-              const filtered = leadsFormFilter === "all" ? leadsData.leads : leadsData.leads.filter((l: any) => l.form_name === leadsFormFilter);
-              const fieldLabels: Record<string, string> = {
-                full_name: "Name", email: "Email", phone_number: "Phone",
-                city: "City", state: "State", zip_code: "Zip",
-                job_title: "Job Title", company_name: "Company",
-              };
-              return (
+            ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
@@ -7309,7 +7341,7 @@ export default function Dashboard() {
                         <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Date</th>
                         {leadsData.fieldKeys.map((key: string) => (
                           <th key={key} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
-                            {fieldLabels[key] || key.replace(/_/g, " ")}
+                            {LEAD_FIELD_LABELS[key] || key.replace(/_/g, " ")}
                           </th>
                         ))}
                         <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>Form</th>
@@ -7340,11 +7372,11 @@ export default function Dashboard() {
                     <span>Last refreshed: {new Date().toLocaleTimeString()}</span>
                   </div>
                 </div>
-              );
-            })()}
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           SOCIAL-DASH — Creator Studio Section
