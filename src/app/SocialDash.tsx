@@ -118,6 +118,7 @@ const findScenesRecursively = (obj: any): any[] => {
 interface ToastState {
   message: string;
   type: string;
+  persistent?: boolean;
 }
 
 export default function SocialDash() {
@@ -458,9 +459,11 @@ export default function SocialDash() {
   };
 
 
-  const showToast = (message: string, type = 'info') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+  const showToast = (message: string, type = 'info', persistent = false) => {
+    setToast({ message, type, persistent });
+    if (!persistent) {
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   const triggerWebhook = async (url: string, label: string, successMessage: string, body: any = null, method = 'POST') => {
@@ -489,7 +492,8 @@ export default function SocialDash() {
       catch { data = rawText ? { message: rawText } : { status: 'ok' }; }
 
       if (response.ok) {
-        showToast(successMessage, 'success');
+        const isPostAction = label === 'post' || label === 'post_social';
+        showToast(successMessage, 'success', isPostAction);
         return data;
       } else {
         console.error(`[UI] Webhook failed:`, data);
@@ -1660,26 +1664,25 @@ export default function SocialDash() {
       </div>
     );
   };
-
-  const handlePostVideo = () => {
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_POST_VIDEO_URL;
-    triggerWebhook(
-      webhookUrl,
-      "post",
-      "VIDEO PUBLISHED SUCCESSFULLY",
-      {
-        video_url: supabaseVideoUrl || videoUrl,
-        metadata: videoMetadata,
-        status: "Approved"
-      },
-      "POST"
-    );
-  };
+const handlePostVideo = () => {
+  const webhookUrl = process.env.NEXT_PUBLIC_N8N_SOCIAL_POST_VIDEO_URL;
+  triggerWebhook(
+    webhookUrl,
+    "post",
+    "VIDEO PUBLISHED SUCCESSFULLY",
+    {
+      video_url: supabaseVideoUrl || videoUrl,
+      metadata: videoMetadata,
+      status: "Approved"
+    },
+    "POST"
+  );
+};
 
   /* ---- Portal Toast (renders directly into document.body, fully independent) ---- */
   const toastPortal = typeof window !== 'undefined' && toast
     ? createPortal(
-        <div className="sd-portal-toast">
+        <div className="sd-portal-toast" style={{ pointerEvents: 'auto' }}>
           <div className="sd-portal-toast-inner">
             <div className="sd-portal-toast-icon">
               {toast.type === 'success'
@@ -1692,6 +1695,36 @@ export default function SocialDash() {
               </span>
               <span className="sd-portal-toast-msg">{toast.message}</span>
             </div>
+            {toast.persistent && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setToast(null);
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  width: 24,
+                  height: 24,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginLeft: 4,
+                  pointerEvents: 'auto',
+                  position: 'relative',
+                  zIndex: 10,
+                }}
+                aria-label="Dismiss notification"
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>,
         document.body
@@ -1749,13 +1782,14 @@ export default function SocialDash() {
                   <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     <Tag size={12} color="#d97706" /> Category
                   </label>
-                  <input
-                    type="text"
-                    name="category"
+                  <CustomSelect
                     value={videoFormData.category}
-                    onChange={(e) => setVideoFormData(prev => ({ ...prev, category: e.target.value }))}
-                    style={{ padding: '11px 14px', fontSize: '13px', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc', color: '#0f172a', outline: 'none', width: '100%', boxSizing: 'border-box' }}
-                    placeholder="e.g. Hair Transplant"
+                    onChange={v => setVideoFormData(prev => ({ ...prev, category: v }))}
+                    options={[
+                      { value: "Hair Transplant", label: "Hair Transplant" },
+                      { value: "Dental Implants", label: "Dental Implants" },
+                      { value: "Rhinoplasty", label: "Rhinoplasty" },
+                    ]}
                   />
                 </div>
 
@@ -1911,6 +1945,12 @@ export default function SocialDash() {
                       const raw = parseInt(e.target.value, 10);
                       const clamped = (isNaN(raw) || raw < 30) ? 30 : Math.min(raw, 90);
                       setVideoFormData(prev => ({ ...prev, duration: clamped }));
+                      e.target.style.borderColor = '#e2e8f0';
+                      e.target.style.background = '#f8fafc';
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#0284c7';
+                      e.target.style.background = '#ffffff';
                     }}
                     min={30}
                     max={90}
@@ -1931,6 +1971,8 @@ export default function SocialDash() {
                   name="description"
                   value={videoFormData.description}
                   onChange={(e) => setVideoFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onFocus={(e) => { e.target.style.borderColor = '#0284c7'; e.target.style.background = '#ffffff'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; }}
                   placeholder="Tell your patient story or describe the blog post content..."
                   style={{
                     height: '80px',
@@ -2481,7 +2523,7 @@ export default function SocialDash() {
                             });
                           }}
                           rows={4}
-                          placeholder={`Draft your perfect native ${activeVideoPlatform} copy...`}
+                   placeholder={`Draft your perfect native ${activeVideoPlatform} copy...`}
                           style={{
                             width: '100%',
                             padding: '10px 12px',
@@ -2499,6 +2541,57 @@ export default function SocialDash() {
                           onFocus={(e) => e.target.style.borderColor = '#0284c7'}
                           onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                         />
+
+                        {/* Clickable Medical Hashtag Palette — Video */}
+                        <div style={{ marginTop: '10px' }}>
+                          <p style={{ fontSize: '10px', color: '#64748b', fontWeight: 600, marginBottom: '6px', margin: '0 0 6px 0' }}>⚕️ Tap to Append Healthcare Hashtags</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {['#TOGAHealth', '#HairTransplantTurkey', '#DHITransplant', '#MedicalTourism', '#ConfidenceRestored'].map((tag) => (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  const currentText = getActiveVideoText();
+                                  const space = currentText.endsWith(' ') || currentText === '' ? '' : ' ';
+                                  const newText = currentText + space + tag;
+                                  setVideoMetadata((prev: any) => {
+                                    const currentMetadata = prev ? { ...prev } : {
+                                      instagram: { content: socialDescriptions.instagram },
+                                      facebook: { content: socialDescriptions.facebook },
+                                      linkedin: { content: socialDescriptions.linkedin },
+                                      tiktok: { caption: socialDescriptions.tiktok },
+                                      youtube: { title: "From Hiding My Smile to Loving It 💙", description: socialDescriptions.instagram },
+                                      twitter: { content: socialDescriptions.twitter }
+                                    };
+                                    const updatedPlatformData = { ...currentMetadata[activeVideoPlatform] };
+                                    if (activeVideoPlatform === 'tiktok') {
+                                      updatedPlatformData.caption = newText;
+                                    } else if (activeVideoPlatform === 'youtube') {
+                                      updatedPlatformData.description = newText;
+                                    } else {
+                                      updatedPlatformData.content = newText;
+                                    }
+                                    return { ...currentMetadata, [activeVideoPlatform]: updatedPlatformData };
+                                  });
+                                }}
+                                style={{
+                                  background: '#f1f5f9',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '9px',
+                                  fontWeight: 600,
+                                  color: '#475569',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569'; }}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2575,6 +2668,8 @@ export default function SocialDash() {
                         fontFamily: 'inherit',
                         outline: 'none'
                       }}
+                      onFocus={(e) => { e.target.style.borderColor = '#0284c7'; e.target.style.background = '#ffffff'; }}
+                      onBlur={(e) => { e.target.style.borderColor = imagePrompt.trim() && !meetsMin ? '#f97316' : '#cbd5e1'; e.target.style.background = '#f8fafc'; }}
                       required
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2659,7 +2754,7 @@ export default function SocialDash() {
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ fontSize: '14px', fontWeight: 600, color: '#475569', margin: 0 }}>No Image Generated Yet</p>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Click “Generate Social Images” on the left to create platform-ready visuals.</p>
+                  <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Click "Generate Social Images" on the left to create platform-ready visuals.</p>
                 </div>
               </div>
             ) : (

@@ -89,14 +89,17 @@ export default function GeneratorModal({ isOpen, onOpenChange, onSubmit, loading
               {/* Category */}
               <div className="sd-form-field">
                 <label className="sd-form-label"><Tag size={13} /> Category</label>
-                <input 
-                  type="text"
+                <select 
                   name="category" 
                   value={formData.category} 
                   onChange={handleChange}
                   className="sd-form-select"
-                  placeholder="e.g. Hair Transplant"
-                />
+                  required
+                >
+                  <option value="Hair Transplant">Hair Transplant</option>
+                  <option value="Dental Implants">Dental Implants</option>
+                  <option value="Rhinoplasty">Rhinoplasty</option>
+                </select>
               </div>
 
               {/* Video Style */}

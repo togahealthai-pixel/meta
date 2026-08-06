@@ -5604,17 +5604,28 @@ export default function Dashboard() {
                   {/* HELPER FOR RENDERING CARDS */}
                   {(() => {
                     const renderCard = (latestEntry) => {
-                      const url = latestEntry?.text || "";
-                      const isVideo = (latestEntry?.format || "").toLowerCase() === "video";
+  const url = latestEntry?.text || "";
+  const isVideo = (latestEntry?.format || "").toLowerCase() === "video";
 
-                      const id = latestEntry?.id || "Unknown";
-                      let label = isVideo ? `Video Ad ${id}` : `Image Ad ${id}`;
+  const id = latestEntry?.id || "Unknown";
+  let label = isVideo ? `Video Ad ${id}` : `Image Ad ${id}`;
 
-                      return (
-                        <Card key={latestEntry?.id + "_" + latestEntry?.time} style={{ padding: 12, height: "100%" }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                            {label}
-                          </div>
+  return (
+    <Card key={latestEntry?.id + "_" + latestEntry?.time} style={{ padding: 12, height: "100%" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          {label}
+        </div>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          fontSize: 10, fontWeight: 800, color: "#b45309",
+          background: "#fffbeb", border: "1px solid #fde68a",
+          padding: "3px 9px", borderRadius: 20, textTransform: "uppercase", letterSpacing: "0.03em"
+        }}>
+          🟡 Pending Review
+        </span>
+      </div>
+                      
                           <div style={{
                             background: "#000",
                             borderRadius: "var(--radius-md)",
@@ -5884,16 +5895,28 @@ export default function Dashboard() {
                     <Card key={`${ad.id}_${ad.time}`} style={{ padding: isMobileCard ? 8 : 12, display: "flex", flexDirection: "column", gap: 8 }}>
                       {/* Header */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap" }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em",
-                          padding: "2px 7px", borderRadius: 20,
-                          color: isVid ? "var(--primary)" : "var(--amber)",
-                          background: isVid ? "var(--primary-light)" : "var(--amber-light)",
-                          border: `1px solid ${isVid ? "var(--primary-mid)" : "#fde68a"}`,
-                          flexShrink: 0
-                        }}>
-                          {isVid ? "🎬" : "🖼️"} {isVid ? "Video" : "Image"}
-                        </span>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+  <span style={{
+    fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em",
+    padding: "2px 7px", borderRadius: 20,
+    color: isVid ? "var(--primary)" : "var(--amber)",
+    background: isVid ? "var(--primary-light)" : "var(--amber-light)",
+    border: `1px solid ${isVid ? "var(--primary-mid)" : "#fde68a"}`,
+    flexShrink: 0
+  }}>
+    {isVid ? "🎬" : "🖼️"} {isVid ? "Video" : "Image"}
+  </span>
+  <span style={{
+    fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em",
+    padding: "2px 7px", borderRadius: 20,
+    color: "#16a34a",
+    background: "#f0fdf4",
+    border: "1px solid #86efac",
+    flexShrink: 0
+  }}>
+    ✓ Approved
+  </span>
+</div>
                         <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 500, lineHeight: 1.2, textAlign: "right" }}>
                           {dateStr}<br/>{timeStr}
                         </span>
